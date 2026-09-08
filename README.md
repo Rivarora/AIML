@@ -27,6 +27,7 @@ pip install -r requirements.txt
 ### 3) Run pipeline scripts (from repository root)
 
 ```powershell
+python scripts/preprocess.py
 python scripts/dataset_checks.py
 python scripts/select_and_split.py
 python scripts/run_eda.py
@@ -39,6 +40,11 @@ python scripts/analyze_baselines.py
 - EDA text/statistics/plots: outputs/eda/
 - Model metrics: outputs/metrics/baseline_metrics.csv
 - Saved baseline models: models/
+
+Generated datasets, model files, and analysis outputs are intentionally not
+committed to Git. The `.gitignore` file excludes `data/interim/`,
+`data/processed/`, `data/splits/`, `models/`, and `outputs/`. Run the pipeline
+commands to recreate them locally from the tracked raw data and source code.
 
 ### 5) If running from scripts folder
 
@@ -129,6 +135,7 @@ AIML/
 |       |-- placement_val.csv
 |       |-- placement_test.csv
 |-- scripts/
+|   |-- preprocess.py
 |   |-- dataset_checks.py
 |   |-- select_and_split.py
 |   |-- run_eda.py
@@ -217,16 +224,10 @@ Concepts:
 - Duplicate removal
 - Consistent datatypes
 
-Core code pattern:
+Implementation: `python scripts/preprocess.py`
 
-```python
-import pandas as pd
-
-df = pd.read_csv("data/raw/StudentPerformanceFactors.csv")
-df = df.drop_duplicates()
-# Add missing-value handling policy here (drop/impute based on feature semantics)
-df.to_csv("data/interim/StudentPerformanceFactors_clean.csv", index=False)
-```
+The script removes duplicate rows and drops incomplete student records. It
+writes `data/interim/StudentPerformanceFactors_clean.csv`.
 
 ### 3) Data Integration / Pair Construction
 
@@ -238,6 +239,11 @@ Concepts:
 Output artifact:
 
 - data/interim/combined_synthetic_dataset.csv
+
+The current source files do not share a student identifier, so the script
+pairs the cleaned student rows with placement rows by row order and records a
+`synthetic_pair_id`. This is a synthetic dataset construction, not a real
+student-level join.
 
 ### 4) Encoding and Final Preprocessing
 
@@ -251,6 +257,10 @@ Expected outputs:
 
 - data/processed/combined_encoded.csv
 - data/processed/final_preprocessed_dataset.csv
+
+The implementation uses explicit mappings for binary and ordinal categorical
+fields, one-hot encodes `Peer_Influence`, maps the `Placement` target to 0/1,
+and removes identifier columns that are not model features.
 
 ### 5) Data Quality Checks
 
@@ -356,6 +366,7 @@ Outputs:
 ## One-Command Reproduction (Current Stage)
 
 ```powershell
+python scripts/preprocess.py
 python scripts/dataset_checks.py
 python scripts/select_and_split.py
 python scripts/run_eda.py
