@@ -38,27 +38,29 @@ PLACEMENT_FEATURES = [
 
 
 def select_and_split(X, y, task, k=8):
-    # --- Feature selection: keep the k features most related to the target ---
-    score_func = f_regression if task == "regression" else f_classif
-    selector = SelectKBest(score_func=score_func, k=k)
-    selector.fit(X, y)
-
-    scores = pd.Series(selector.scores_, index=X.columns).sort_values(ascending=False)
-    selected_features = scores.head(k).index.tolist()
-    print(f"\nTop {k} features for {task} target (by statistical score):")
-    print(scores.head(k).round(2))
-
-    X_selected = X[selected_features]
-
     # --- Split: 70% train, 15% validation, 15% test ---
     stratify_arg = y if task == "classification" else None
     X_train, X_temp, y_train, y_temp = train_test_split(
-        X_selected, y, test_size=0.30, random_state=42, stratify=stratify_arg
+        X, y, test_size=0.30, random_state=42, stratify=stratify_arg
     )
     stratify_arg2 = y_temp if task == "classification" else None
     X_val, X_test, y_val, y_test = train_test_split(
         X_temp, y_temp, test_size=0.50, random_state=42, stratify=stratify_arg2
     )
+
+    # --- Feature selection: learn rankings from training data only ---
+    score_func = f_regression if task == "regression" else f_classif
+    selector = SelectKBest(score_func=score_func, k=k)
+    selector.fit(X_train, y_train)
+
+    scores = pd.Series(selector.scores_, index=X.columns).sort_values(ascending=False)
+    selected_features = scores.head(k).index.tolist()
+    print(f"\nTop {k} features for {task} target (training data only):")
+    print(scores.head(k).round(2))
+
+    X_train = X_train[selected_features]
+    X_val = X_val[selected_features]
+    X_test = X_test[selected_features]
 
     print(f"Train: {X_train.shape[0]} rows | Validation: {X_val.shape[0]} rows | Test: {X_test.shape[0]} rows")
     return X_train, X_val, X_test, y_train, y_val, y_test, selected_features

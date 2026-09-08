@@ -2,16 +2,16 @@
   {
     "task": "exam_score_regression",
     "model": "LinearRegression",
-    "MAE": 0.9224941863548962,
+    "MAE": 0.9224941863548958,
     "RMSE": 2.3377841334514278,
     "R2": 0.6585429789192967
   },
   {
     "task": "exam_score_regression",
     "model": "RandomForestRegressor",
-    "MAE": 1.1984482758620687,
-    "RMSE": 2.587670483633963,
-    "R2": 0.5816447939335168
+    "MAE": 1.197748171368861,
+    "RMSE": 2.5891529369727238,
+    "R2": 0.5811653126957024
   },
   {
     "task": "placement_classification",
