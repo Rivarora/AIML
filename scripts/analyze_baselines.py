@@ -24,6 +24,8 @@ from sklearn.metrics import (
     r2_score,
 )
 
+from model_config import EXAM_MODEL_FEATURES, PLACEMENT_MODEL_FEATURES
+
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SPLITS_DIR = PROJECT_ROOT / "data" / "splits"
@@ -43,8 +45,8 @@ def analyze_placement() -> None:
     """Save confusion matrices, classification reports, and a comparison table."""
     _, _, test = load_split("placement")
     target = "Placement"
-    X_test = test.drop(columns=[target])
-    y_test = test[target]
+    X_test = test[PLACEMENT_MODEL_FEATURES]
+    y_test = (test[target] == "Yes").astype(int)
     rows = []
 
     plt.figure(figsize=(10, 4))
@@ -99,7 +101,7 @@ def analyze_exam_score() -> None:
     """Save prediction errors and a residual distribution plot."""
     _, _, test = load_split("exam_score")
     target = "Exam_Score"
-    X_test = test.drop(columns=[target])
+    X_test = test[EXAM_MODEL_FEATURES]
     y_test = test[target]
     error_frames = []
 
@@ -196,8 +198,8 @@ def validate_leakage() -> None:
         "==================",
         "",
         "These checks validate the generated split artifacts; they cannot prove that the source datasets are free from semantic leakage.",
-        "Feature selection is performed on training data only in scripts/select_and_split.py.",
-        "Repeated encoded feature combinations are reported separately from repeated combinations with conflicting targets.",
+        "Feature values are split before model-specific encoding; imputation, scaling, and one-hot encoding are fitted inside each training pipeline.",
+        "Repeated feature combinations are reported separately from repeated combinations with conflicting targets.",
         "",
     ]
     for check in checks:
@@ -212,8 +214,9 @@ def validate_leakage() -> None:
             "Interpretation:",
             "- Exact feature overlap can occur because encoded features have limited discrete values.",
             "- Conflicting targets for the same feature combination are a stronger warning sign than overlap alone.",
-            "- The synthetic row-wise pairing of the two source datasets remains a validity limitation.",
-            "- Perfect random-forest placement results should not be treated as proof of real-world performance.",
+            "- The exam and placement sources are independent and share no student identifier.",
+            "- No row-order combined file exists in this version of the project.",
+            "- The placement label is deterministic in the source data; the depth-limited forest and the investigation report make that explicit.",
         ]
     )
     (OUTPUT_DIR / "leakage_validation.txt").write_text("\n".join(report_lines), encoding="utf-8")

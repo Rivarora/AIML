@@ -1,30 +1,71 @@
 # Student Performance Analytics
 
-Minimal project scope:
+Student Performance Analytics is a Python/Flask project for exploring two
+independent student datasets:
 
-- Predict student Exam_Score (regression)
-- Predict student Placement (classification)
+- **Exam score regression** using `StudentPerformanceFactors.csv`
+- **Placement classification** using `college_student_placement_dataset.csv`
 
-This repository currently covers data preparation, EDA artifacts, baseline modeling, and project structure for team-based continuation.
+The project includes reproducible preprocessing, exploratory analysis, data
+quality checks, PCA, baseline model training, validation, and a small web
+dashboard.
 
-## Quick Start (Install and Run)
+## Important limitation
 
-### 1) Clone and open
+The source datasets do not share a student identifier. They are processed and
+modeled as separate tracks. The project does not claim that an exam record and a
+placement record describe the same student, and no row-order pairing is used.
+Placement predictions must not be interpreted as outcomes for the exam records.
 
-```powershell
-git clone <repo-url>
-cd AIML
-```
+The placement label is deterministic in the source dataset: `Placement` is
+`Yes` when at least three of these conditions hold:
 
-### 2) Create environment and install dependencies
+- `IQ > 110`
+- `CGPA > 8`
+- `Projects_Completed > 1`
+- `Communication_Skills > 7`
+
+Consequently, very high placement metrics describe the construction of this
+dataset and should not be treated as evidence of real-world predictive
+performance.
+
+## Requirements
+
+- Python 3.10 or newer
+- PowerShell on Windows, or an equivalent shell
+
+Install the pinned dependencies:
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\activate
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 ```
 
-### 3) Run pipeline scripts (from repository root)
+The current environment pins Flask, pandas, scikit-learn, matplotlib, and
+joblib. Saved scikit-learn models are version-sensitive. If the scikit-learn
+version changes, retrain the generated models before starting the dashboard:
+
+```powershell
+python scripts/train_baselines.py
+```
+
+## Input data
+
+Place the following files in `data/raw/`:
+
+```text
+data/raw/StudentPerformanceFactors.csv
+data/raw/college_student_placement_dataset.csv
+```
+
+These source files are expected to contain the exam-score and placement
+features used by the pipeline. The preprocessing script validates required
+columns, data types, ranges, categories, duplicates, and missing values.
+
+## Reproduce the pipeline
+
+Run these commands from the repository root:
 
 ```powershell
 python scripts/preprocess.py
@@ -37,437 +78,222 @@ python scripts/train_baselines.py
 python scripts/analyze_baselines.py
 ```
 
-The saved model files are generated artifacts and must be retrained when the
-scikit-learn version changes. The project pins scikit-learn to `1.9.0`; if
-startup reports an `InconsistentVersionWarning`, activate the project
-environment and rerun `python scripts/train_baselines.py`.
+The scripts run in this order:
 
-### 6) Run the interactive dashboard
+1. `preprocess.py` cleans the two source tracks independently and writes
+   provenance information.
+2. `dataset_checks.py` performs structural dataset checks.
+3. `select_and_split.py` creates reproducible 70/15/15 train, validation, and
+   test splits.
+4. `data_quality.py` writes data-quality and linkage reports.
+5. `pca_analysis.py` fits task-specific PCA transformations using training
+   features only.
+6. `run_eda.py` creates distributions, correlations, and summary statistics.
+7. `train_baselines.py` trains, validates, evaluates, and saves model pipelines.
+8. `analyze_baselines.py` creates residual, classification, and leakage
+   analysis artifacts.
 
-The Stitch-inspired frontend is served by Flask and calls the trained models
-through JSON API endpoints:
+`scripts/model_config.py` is the ninth Python file in this directory, but it
+is a shared configuration module rather than a script to run. It defines the
+model features, categorical values, model labels, and reproducibility settings
+used by `train_baselines.py`, `analyze_baselines.py`, and `app.py`.
+
+## Run the dashboard
+
+After the pipeline has generated the required artifacts:
 
 ```powershell
 python app.py
 ```
 
-Open `http://127.0.0.1:5000` in a browser. The dashboard includes:
+Open <http://127.0.0.1:5000>.
 
-- Overview metrics and feature summaries
-- Live exam-score prediction using the saved Linear Regression model
-- Live placement prediction using the saved Random Forest model
-- Current model metrics and data-quality checks
-- Project limitations and research notes
+The dashboard provides:
 
-The API also exposes `/api/health`, `/api/summary`, `/api/metrics`,
-`/api/data-quality`, `/api/pca`, `/api/predict/exam`, and
-`/api/predict/placement`. Exam and placement records are independent source
-tracks; there is no shared student identifier. Placement predictions remain
-experimental and must not be interpreted as outcomes for the exam records.
+- Dataset summaries and data-quality status
+- Exam-score prediction with the deployed Linear Regression pipeline
+- Placement prediction with a depth-limited Random Forest pipeline
+- Baseline test metrics and five-fold cross-validation
+- Overfitting analysis
+- PCA visualization
+- Placement-label investigation and project limitations
 
-### 4) Where outputs are generated
+This is a Flask development server and is not intended for production
+deployment.
 
-- EDA text/statistics/plots: outputs/eda/
-- Model metrics: outputs/metrics/baseline_metrics.csv
-- Saved baseline models: models/
+## API endpoints
 
-Generated datasets, model files, and analysis outputs are intentionally not
-committed to Git. The `.gitignore` file excludes `data/interim/`,
-`data/processed/`, `data/splits/`, `models/`, and `outputs/`. Run the pipeline
-commands to recreate them locally from the tracked raw data and source code.
+### Health and reports
 
-### 5) If running from scripts folder
-
-```powershell
-cd scripts
-python dataset_checks.py
-python select_and_split.py
-python run_eda.py
-python train_baselines.py
+```text
+GET  /api/health
+GET  /api/summary
+GET  /api/metrics
+GET  /api/cross-validation
+GET  /api/overfitting
+GET  /api/model-card
+GET  /api/data-quality
+GET  /api/pca
+GET  /api/pca/visualization
+GET  /api/placement-investigation
 ```
 
-## Team Ownership (Evaluation-1 Workflow)
+### Predictions
 
-### Teammate 1 (data reliability and preprocessing)
+```text
+POST /api/predict/exam
+POST /api/predict/placement
+```
 
-- Validates schemas, types, missing values, ranges, and categories before encoding
-- Keeps exam-score and placement workflows separate in the main modeling path
-- Generates machine-readable data-quality and training-only PCA artifacts
-- Retains row-order pairing only as an explicitly labelled experimental artifact
+Example exam request:
 
-### Teammate 2 (completed in this stage)
+```json
+{
+  "hours_studied": 20,
+  "attendance": 90,
+  "previous_scores": 80,
+  "tutoring_sessions": 2,
+  "access_to_resources": "High",
+  "parental_involvement": "Medium",
+  "parental_education_level": "College",
+  "family_income": "Medium"
+}
+```
 
-- Reorganized project structure for reproducibility
-- Added script-based EDA pipeline
-- Added script-based baseline model training for both tasks
-- Added project documentation, progress status, and handoff notes
-- Generated outputs (EDA plots, metrics CSV/JSON, saved baseline models)
+Example placement request:
 
-### Teammate 3 (completed in this stage)
+```json
+{
+  "iq": 120,
+  "prev_sem_result": 8,
+  "cgpa": 8.5,
+  "academic_performance": 8,
+  "internship_experience": "Yes",
+  "extra_curricular_score": 7,
+  "communication_skills": 8,
+  "projects_completed": 3
+}
+```
 
-- Moved feature selection after splitting so `SelectKBest` is fitted on training data only
-- Added placement confusion matrices and classification reports
-- Added exam-score residual and error analysis
-- Added structural leakage checks for target presence, repeated feature combinations, and conflicting targets
-- Re-trained baseline models and documented the findings below
+The prediction endpoints validate numeric ranges and category values. Category
+fields accept their labels; legacy zero-based category indexes are also
+accepted by the API.
 
-## What Counts as 40% (Evaluation-1)
+## Modeling approach
 
-Evaluation-1 (target 40%) includes:
+The model feature definitions are centralized in
+[`scripts/model_config.py`](scripts/model_config.py).
 
-1. Problem statement and objective definition
-2. Data pipeline readiness (raw -> interim -> processed -> splits)
-3. EDA outputs and basic insights
-4. Baseline models for both tasks
-5. Metrics summary and initial interpretation
-6. Presentation-ready technical report/slides
+Each saved model is a scikit-learn `Pipeline`:
 
-Current status relative to 40%:
+- Numeric features: median imputation followed by `StandardScaler`
+- Categorical features: most-frequent imputation followed by
+  `OneHotEncoder(handle_unknown="ignore")`
+- All preprocessing is fitted on training data only
+- Five-fold cross-validation uses `random_state=42`
 
-- Completed: items 1 to 6 at baseline level.
-- The presentation still needs the team's names, mentor, date, and original
-  dataset URLs before submission.
+Deployed models:
 
-## What Is Left After 40% (Final Phase)
+| Track | Model | Artifact |
+|---|---|---|
+| Exam score | Linear Regression | `models/LinearRegression_exam_score.joblib` |
+| Placement | Random Forest Classifier, `max_depth=2`, `min_samples_leaf=25` | `models/RandomForestClassifier_placement.joblib` |
 
-1. Hyperparameter tuning and stronger model comparison
-2. Robust validation and leakage checks
-3. Explainability (feature importance, SHAP or equivalent)
-4. Better reporting/dashboard/demo
-5. Final narrative: limitations, ethics/bias note, and deployment readiness
+## Current baseline results
 
-## Project Structure and File Meanings
+Results below come from the generated test and cross-validation artifacts.
+Metrics can change if the raw datasets or pipeline configuration changes.
+
+| Track | Model | Test result | Five-fold CV |
+|---|---|---|---|
+| Exam | Linear Regression | MAE 0.9190, RMSE 2.1978, R2 0.6974 | MAE 0.9294 +/- 0.0553, R2 0.6681 +/- 0.0589 |
+| Exam | Random Forest Regressor | MAE 1.1522, RMSE 2.3488, R2 0.6544 | MAE 1.1986 +/- 0.0565, R2 0.6163 +/- 0.0523 |
+| Placement | Logistic Regression | Accuracy 0.8687, F1 0.6888, ROC-AUC 0.9487 | Accuracy 0.8514 +/- 0.0126, F1 0.6610 +/- 0.0260 |
+| Placement | Random Forest Classifier | Accuracy 0.9533, F1 0.8768, ROC-AUC 0.9924 | Accuracy 0.9471 +/- 0.0044, F1 0.8627 +/- 0.0097 |
+
+The deployed exam model is the stronger exam baseline. The deployed placement
+model is intentionally capacity-limited because an unrestricted forest
+recovers the deterministic source label with a perfect score.
+
+## Generated files
+
+Generated files are excluded from Git by `.gitignore` and can be recreated by
+running the pipeline.
+
+```text
+data/
+|-- interim/
+|   |-- StudentPerformanceFactors_clean.csv
+|   |-- placement_clean.csv
+|   |-- provenance.json
+|-- processed/
+|   |-- exam_score_preprocessed.csv
+|   |-- placement_preprocessed.csv
+|-- splits/
+    |-- exam_score_train.csv
+    |-- exam_score_val.csv
+    |-- exam_score_test.csv
+    |-- placement_train.csv
+    |-- placement_val.csv
+    |-- placement_test.csv
+    |-- split_manifest.json
+
+outputs/
+|-- eda/
+|-- quality/
+|-- pca/
+|-- metrics/
+|-- analysis/
+
+models/
+|-- LinearRegression_exam_score.joblib
+|-- RandomForestRegressor_exam_score.joblib
+|-- LogisticRegression_placement.joblib
+|-- RandomForestClassifier_placement.joblib
+```
+
+Important reports include:
+
+- `outputs/quality/data_quality.json`: schema, missing-value, duplicate, and
+  linkage checks
+- `outputs/pca/pca_summary.json`: explained variance and PCA metadata
+- `outputs/metrics/baseline_metrics.csv`: test, validation, and training
+  metrics
+- `outputs/metrics/cross_validation.csv`: five-fold validation results
+- `outputs/metrics/overfitting_analysis.csv`: train-versus-test gaps
+- `outputs/metrics/model_card.json`: deployed model and preprocessing metadata
+- `outputs/analysis/placement_investigation.json`: deterministic-label audit
+- `outputs/analysis/leakage_validation.txt`: structural leakage checks
+
+## Repository structure
 
 ```text
 AIML/
-|-- README.md
+|-- app.py
 |-- requirements.txt
-|-- data/
-|   |-- raw/
-|   |   |-- StudentPerformanceFactors.csv
-|   |   |-- college_student_placement_dataset.csv
-|   |-- interim/
-|   |   |-- StudentPerformanceFactors_clean.csv
-|   |   |-- combined_synthetic_dataset.csv
-|   |-- processed/
-|   |   |-- combined_encoded.csv
-|   |   |-- final_preprocessed_dataset.csv
-|   |-- splits/
-|       |-- exam_score_train.csv
-|       |-- exam_score_val.csv
-|       |-- exam_score_test.csv
-|       |-- placement_train.csv
-|       |-- placement_val.csv
-|       |-- placement_test.csv
+|-- data/raw/
 |-- scripts/
+|   |-- model_config.py
 |   |-- preprocess.py
 |   |-- dataset_checks.py
 |   |-- select_and_split.py
+|   |-- data_quality.py
+|   |-- pca_analysis.py
 |   |-- run_eda.py
 |   |-- train_baselines.py
 |   |-- analyze_baselines.py
-|-- app.py
-|-- web/
-|   |-- index.html
-|-- outputs/
-|   |-- eda/
-|   |   |-- eda_summary.txt
-|   |   |-- descriptive_stats.csv
-|   |   |-- correlation_heatmap.png
-|   |   |-- exam_score_distribution.png
-|   |   |-- placement_distribution.png
-|   |-- metrics/
-|       |-- baseline_metrics.csv
-|       |-- baseline_metrics.json
-|       |-- exam_score_validation_reference.csv
-|       |-- placement_validation_reference.csv
-|   |-- analysis/
-|       |-- placement_confusion_matrices.png
-|       |-- *_confusion_matrix.csv
-|       |-- *_classification_report.csv
-|       |-- exam_score_residual_distribution.png
-|       |-- exam_score_error_analysis.csv
-|       |-- exam_score_error_summary.csv
-|       |-- leakage_checks.csv
-|       |-- leakage_validation.txt
-|-- models/
-|   |-- LinearRegression_exam_score.joblib
-|   |-- RandomForestRegressor_exam_score.joblib
-|   |-- LogisticRegression_placement.joblib
-|   |-- RandomForestClassifier_placement.joblib
+|-- web/index.html
 |-- docs/
 |   |-- Data_Preprocessing_Documentation.docx
 |   |-- summary_first_evaluation.md
+|-- README.md
 ```
 
-### File Purpose Summary
-
-- data/raw: original source datasets
-- data/interim: cleaned/combined intermediate data
-- data/processed: encoded/final model-ready dataset
-- data/splits: train/validation/test files for each target
-- scripts: reproducible pipeline and training scripts
-- outputs/eda: EDA charts and statistics
-- outputs/metrics: generated model metrics
-- models: serialized baseline models
-- docs: documentation and evaluation summary
-
-## Manual Rebuild Guide (From Scratch to Current Stage)
-
-This section explains how to rebuild the project manually (without relying on undocumented "vibecoded" steps).
-
-### 0) Prerequisites
-
-Concepts:
-
-- Python environment management
-- Reproducibility via pinned dependencies
-
-Commands (PowerShell from repository root):
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-### 1) Data Collection
-
-Concepts:
-
-- Source integrity
-- Schema awareness
-
-Expected files:
-
-- data/raw/StudentPerformanceFactors.csv
-- data/raw/college_student_placement_dataset.csv
-
-### 2) Data Cleaning and Standardization
-
-Concepts:
-
-- Missing value handling
-- Duplicate removal
-- Consistent datatypes
-
-Implementation: `python scripts/preprocess.py`
-
-The script validates the raw schemas and categories, removes duplicates, records
-missing rows explicitly, and bounds `Exam_Score` to 0–100. It writes the
-independent model inputs `data/processed/exam_score_preprocessed.csv` and
-`data/processed/placement_preprocessed.csv`. Placement `CGPA` values above 10
-are bounded and counted in the provenance output.
-
-### 3) Data Integration / Pair Construction
-
-Concepts:
-
-- Dataset joining or synthetic pairing strategy
-- Target leakage awareness
-
-Output artifact:
-
-- data/interim/combined_synthetic_dataset.csv
-
-The current source files do not share a student identifier: the exam source has
-no identifier column and `College_ID` has no counterpart in it. The main
-splitting and modeling workflow therefore does not join the datasets. A
-row-order `combined_synthetic_dataset.csv` is still emitted only for
-backwards-compatible experimental analysis and is never used by
-`select_and_split.py`.
-
-### 4) Encoding and Final Preprocessing
-
-Concepts:
-
-- Categorical encoding
-- Numeric consistency
-- Final feature matrix preparation
-
-Expected independent outputs:
-
-- data/processed/exam_score_preprocessed.csv
-- data/processed/placement_preprocessed.csv
-
-Experimental compatibility outputs:
-
-- data/processed/combined_encoded.csv
-- data/processed/final_preprocessed_dataset.csv
-
-The implementation uses explicit mappings for binary and ordinal categorical
-fields, one-hot encodes `Peer_Influence`, maps the `Placement` target to 0/1,
-and removes identifier columns that are not model features.
-
-### 5) Data Quality and PCA Reports
-
-Concepts:
-
-- Null count
-- Duplicate count
-- Type verification
-
-Command:
-
-```powershell
-python scripts/dataset_checks.py
-python scripts/data_quality.py
-python scripts/pca_analysis.py
-```
-
-These commands write `outputs/quality/data_quality.json`,
-`outputs/quality/data_quality.csv`, `outputs/pca/pca_summary.json`,
-`outputs/pca/pca_components.csv`, and
-`outputs/pca/pca_visualization.png`. PCA scaling and fitting use training
-features only, separately for each task track; targets are used only for plot
-coloring.
-
-### 6) Feature Selection + Train/Val/Test Split
-
-Concepts:
-
-- Statistical feature selection
-- Separate task tracks (regression vs classification)
-- Reproducible random_state
-
-Important implementation detail:
-
-- The dataset is split before `SelectKBest` is fitted. Feature rankings are learned from the training partition only, preventing validation and test targets from influencing feature selection.
-
-Command:
-
-```powershell
-python scripts/select_and_split.py
-```
-
-Outputs:
-
-- exam_score_train/val/test.csv
-- placement_train/val/test.csv
-
-### 7) EDA and Visualization
-
-Concepts:
-
-- Distribution analysis
-- Correlation analysis
-- Target balance check
-
-Command:
-
-```powershell
-python scripts/run_eda.py
-```
-
-Outputs:
-
-- outputs/eda/\*.png
-- outputs/eda/descriptive_stats.csv
-- outputs/eda/eda_summary.txt
-
-### 8) Baseline Model Training
-
-Concepts:
-
-- Baseline benchmarking
-- Task-specific metrics
-- Model artifact persistence
-
-Command:
-
-```powershell
-python scripts/train_baselines.py
-```
-
-Outputs:
-
-- outputs/metrics/baseline_metrics.csv
-- models/\*.joblib
-
-### 9) Teammate 3 Analysis and Validation
-
-Concepts:
-
-- Confusion matrix and class-specific metrics
-- Residual analysis for regression
-- Structural leakage checks
-- Evidence-based interpretation of suspiciously strong results
-
-Command:
-
-```powershell
-python scripts/analyze_baselines.py
-```
-
-Outputs:
-
-- outputs/analysis/placement_confusion_matrices.png
-- outputs/analysis/\*\_classification_report.csv and `.txt`
-- outputs/analysis/exam_score_residual_distribution.png
-- outputs/analysis/exam_score_error_analysis.csv
-- outputs/analysis/exam_score_error_summary.csv
-- outputs/analysis/leakage_checks.csv
-- outputs/analysis/leakage_validation.txt
-
-## One-Command Reproduction (Current Stage)
-
-```powershell
-python scripts/preprocess.py
-python scripts/dataset_checks.py
-python scripts/select_and_split.py
-python scripts/run_eda.py
-python scripts/train_baselines.py
-python scripts/analyze_baselines.py
-```
-
-## Current Baseline Metrics Snapshot
-
-From outputs/metrics/baseline_metrics.csv:
-
-- Exam_Score (LinearRegression): MAE 0.9194, RMSE 2.1981, R2 0.6974
-- Exam_Score (RandomForestRegressor): MAE 1.1996, RMSE 2.4082, R2 0.6367
-- Placement (LogisticRegression): Accuracy 0.9112, F1 0.7059, ROC-AUC 0.9520
-- Placement (RandomForestClassifier): Accuracy 0.9979, F1 0.9935, ROC-AUC 1.0000
-
-Note: Perfect classification metrics should be investigated for possible leakage before final conclusions.
-
-## Teammate 3 Findings
-
-### Placement Classification
-
-- LogisticRegression remains the more conservative baseline: accuracy 0.9112, positive-class precision 0.7669, recall 0.6538, and F1 0.7059.
-- RandomForestClassifier still produces near-perfect test metrics after training-only feature selection: accuracy 0.9979, precision 1.0000, recall 0.9872, F1 0.9935, and ROC-AUC 1.0000.
-- Therefore, the perfect result was not caused only by selecting features on the full dataset. It remains a risk signal requiring stronger validation, such as repeated cross-validation, permutation testing, and review of the source data construction.
-- Because the positive class is only 1,040 of 6,378 rows, accuracy alone is not sufficient; positive-class recall and F1 should be emphasized.
-
-### Exam Score Regression
-
-- LinearRegression remains the stronger baseline: MAE 0.9194, RMSE 2.1980, and R2 0.6974.
-- RandomForestRegressor remains weaker: MAE 1.1977, RMSE 2.5892, and R2 0.5812.
-- Mean residuals are close to zero for both models, so there is no large overall directional bias in the test predictions.
-
-### Leakage and Data Validity
-
-- Target columns are absent from the model feature columns.
-- Placement splits have no repeated encoded feature combinations across train, validation, and test.
-- Exam-score splits contain one repeated encoded feature combination between train/validation with conflicting target values. This is a small data-quality warning and should be reviewed before final claims.
-- Structural split checks cannot prove that the source datasets are semantically leakage-free. The two original datasets were paired row-wise synthetically, so the learned placement relationship may not represent real student outcomes.
-
-### What Teammate 3 Should Explain in the Presentation
-
-1. Why the split must happen before feature selection.
-2. How confusion matrices reveal false positives and false negatives beyond accuracy.
-3. Why residuals near zero do not mean every exam-score prediction is accurate.
-4. Why perfect random-forest classification is a warning requiring validation, not automatically a success claim.
-5. Why synthetic pairing limits the real-world interpretation of both tasks.
-
-## Next Action Checklist (Teammate 3)
-
-1. Build 5 to 7 slide deck for Evaluation-1 using the generated evidence
-2. Add repeated cross-validation and permutation testing for placement
-3. Review the one conflicting exam-score feature combination
-4. Finalize docs/summary_first_evaluation.md with conclusions and limitations
-
----
-
-This README is intentionally operational and reproducible: anyone cloning this repository should be able to understand what exists, what was done, and what remains.
+## Limitations and next steps
+
+- The datasets are independent and cannot support student-level outcome
+  analysis.
+- The placement target is deterministic in the source data.
+- The baseline models are not production-ready or evidence of causal effects.
+- Further work could add explainability, stronger model comparison, external
+  validation, fairness analysis, and production deployment controls.

@@ -6,334 +6,729 @@
   <title>Student Performance Analytics</title>
   <style>
     :root {
-      --ink: #172033;
-      --muted: #667085;
-      --line: #e5e7eb;
-      --surface: #ffffff;
-      --background: #f8fafc;
-      --blue: #3156d3;
-      --blue-soft: #eef2ff;
-      --orange: #a15c00;
-      --orange-soft: #fff7e6;
-      --green: #087c68;
-      --red: #b42318;
+      --ink: #232323;
+      --muted: #6b6f73;
+      --line: #e2e1dc;
+      --paper: #ffffff;
+      --page: #f6f5f1;
+      --accent: #2f5d50;
+      --accent-soft: #eef3f0;
+      --warn: #8a5a1f;
+      --warn-soft: #fbf4e6;
+      --bad: #9b2c2c;
     }
-
     * { box-sizing: border-box; }
     body {
       margin: 0;
+      background: var(--page);
       color: var(--ink);
-      background: var(--background);
-      font: 14px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font: 15px/1.55 "Segoe UI", system-ui, -apple-system, sans-serif;
     }
+    h1, h2, h3, p { margin: 0; }
+    h1 { font-size: 30px; line-height: 1.2; font-weight: 650; letter-spacing: -0.01em; }
+    h2 { font-size: 19px; font-weight: 650; }
+    h3 { font-size: 15px; font-weight: 650; }
     button, input, select { font: inherit; }
     button { cursor: pointer; }
-    h1, h2, h3, p { margin: 0; }
-    h1, h2 { letter-spacing: -.025em; }
-    h1 { font-size: clamp(24px, 3vw, 34px); line-height: 1.15; }
-    h2 { font-size: 19px; }
-    h3 { font-size: 15px; }
 
-    .layout { display: flex; min-height: 100vh; }
+    .shell { display: flex; min-height: 100vh; }
     .sidebar {
-      width: 224px;
-      flex: 0 0 224px;
-      padding: 28px 18px;
-      background: var(--surface);
+      width: 216px;
+      flex: 0 0 216px;
+      background: var(--paper);
       border-right: 1px solid var(--line);
+      padding: 26px 16px;
     }
-    .brand { margin: 0 10px 38px; }
-    .brand strong { display: block; font-size: 14px; }
-    .brand span { display: block; color: var(--muted); font-size: 11px; margin-top: 3px; }
-    .nav-label {
-      color: var(--muted);
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: .1em;
-      margin: 0 10px 9px;
-      text-transform: uppercase;
-    }
-    .nav { display: grid; gap: 3px; }
+    .brand { margin: 0 8px 26px; }
+    .brand b { display: block; font-size: 14px; line-height: 1.35; }
+    .brand span { display: block; color: var(--muted); font-size: 12px; margin-top: 4px; }
+    .nav { display: grid; gap: 2px; }
     .nav button {
       border: 0;
-      border-radius: 6px;
-      padding: 9px 10px;
-      color: #475467;
+      border-radius: 5px;
       background: transparent;
+      color: #45494d;
+      padding: 8px 9px;
       text-align: left;
     }
-    .nav button:hover { background: #f2f4f7; }
-    .nav button.active { color: #fff; background: var(--ink); }
-    .dataset-note {
+    .nav button:hover { background: #f1f0ec; }
+    .nav button.active { background: var(--ink); color: #fff; }
+    .side-note {
       border-top: 1px solid var(--line);
       color: var(--muted);
-      font-size: 11px;
-      margin: 28px 10px 0;
+      font-size: 12px;
+      line-height: 1.5;
+      margin: 26px 8px 0;
       padding-top: 14px;
     }
-    .dataset-note strong { color: var(--ink); display: block; font-size: 15px; margin: 3px 0; }
+    .side-note b { color: var(--ink); display: block; font-size: 12px; margin-bottom: 4px; }
 
-    .main { flex: 1; min-width: 0; }
-    .header {
+    main { flex: 1; min-width: 0; }
+    .topbar {
       align-items: center;
-      background: var(--surface);
+      background: var(--paper);
       border-bottom: 1px solid var(--line);
       display: flex;
       justify-content: space-between;
-      min-height: 62px;
-      padding: 0 34px;
+      min-height: 56px;
+      padding: 0 28px;
     }
-    .header small { color: var(--muted); }
-    .header button, .button {
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      background: var(--surface);
-      color: var(--ink);
-      padding: 8px 12px;
-    }
-    .header button:hover, .button:hover { border-color: #b9c1d0; }
-    .content { max-width: 1240px; margin: auto; padding: 34px; }
+    .topbar span { color: var(--muted); font-size: 13px; }
+    .content { max-width: 1060px; padding: 30px 28px 60px; }
     .view.hidden { display: none; }
-    .intro { margin-bottom: 24px; }
-    .intro p, .subtle { color: var(--muted); margin-top: 7px; }
-    .notice {
-      background: var(--orange-soft);
-      border: 1px solid #f3d9a1;
-      border-radius: 8px;
-      color: #704900;
-      margin: 22px 0;
-      padding: 13px 15px;
-    }
-    .notice strong { color: #5a3900; }
-    .notice p { margin-top: 3px; }
-
-    .grid { display: grid; gap: 14px; }
-    .kpis { grid-template-columns: repeat(4, 1fr); }
-    .two { grid-template-columns: repeat(2, 1fr); }
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 19px;
-    }
-    .kpi-label { color: var(--muted); font-size: 12px; }
-    .kpi-value { font-size: 28px; font-weight: 700; margin: 9px 0 1px; }
-    .kpi-note { color: var(--muted); font-size: 12px; }
-    .track { display: flex; flex-direction: column; min-height: 245px; }
-    .track h2 { margin: 12px 0 6px; }
-    .track p { color: var(--muted); min-height: 44px; }
-    .track .button { align-self: flex-start; margin-top: auto; }
-    .track-blue { border-top: 3px solid var(--blue); }
-    .track-green { border-top: 3px solid var(--green); }
-    .metric-row { display: flex; gap: 9px; margin: 18px 0; }
-    .metric { background: #f8fafc; border-radius: 6px; flex: 1; padding: 9px; }
-    .metric small { color: var(--muted); display: block; font-size: 11px; }
-    .metric strong { display: block; font-size: 17px; margin-top: 2px; }
-    .section-heading { align-items: baseline; display: flex; justify-content: space-between; margin: 28px 0 11px; }
-    .features { display: grid; gap: 13px; }
-    .feature { align-items: center; display: grid; gap: 12px; grid-template-columns: 190px 1fr 54px; font-size: 12px; }
-    .bar { background: #edf0f7; border-radius: 20px; height: 7px; overflow: hidden; }
-    .bar i { background: var(--blue); border-radius: inherit; display: block; height: 100%; }
-    .bar.green i { background: var(--green); }
-
-    .page-heading { align-items: start; display: flex; justify-content: space-between; gap: 20px; margin-bottom: 22px; }
-    .label {
+    .page-head { margin-bottom: 20px; }
+    .page-head p, .muted { color: var(--muted); margin-top: 5px; }
+    .eyebrow {
       color: var(--muted);
       display: block;
       font-size: 11px;
       font-weight: 700;
-      letter-spacing: .07em;
-      margin-bottom: 6px;
+      letter-spacing: 0.08em;
+      margin-bottom: 5px;
       text-transform: uppercase;
     }
-    .form-layout { grid-template-columns: 1.2fr .8fr; }
-    .form-card h2 { margin-bottom: 4px; }
-    .form-grid { display: grid; gap: 13px; grid-template-columns: repeat(2, 1fr); margin-top: 18px; }
-    .field { background: #f8fafc; border-radius: 6px; padding: 11px; }
-    .field label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 7px; }
+
+    .warning {
+      background: var(--warn-soft);
+      border: 1px solid #ead8b5;
+      border-radius: 7px;
+      color: #5b421d;
+      margin: 18px 0;
+      padding: 13px 15px;
+    }
+    .warning b { color: #4b3515; }
+    .warning p { margin-top: 4px; }
+
+    .cards { display: grid; gap: 12px; grid-template-columns: repeat(4, 1fr); }
+    .two-col { display: grid; gap: 14px; grid-template-columns: 1fr 1fr; margin-top: 14px; }
+    .card {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 18px;
+    }
+    .stat span { color: var(--muted); display: block; font-size: 12px; }
+    .stat b { display: block; font-size: 26px; font-weight: 650; margin: 5px 0 2px; }
+    .stat small { color: var(--muted); display: block; font-size: 12px; }
+    .track { display: flex; flex-direction: column; }
+    .track h2 { margin: 2px 0 6px; }
+    .track p { color: var(--muted); min-height: 44px; }
+    .badge {
+      background: var(--accent-soft);
+      border-radius: 999px;
+      color: var(--accent);
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+    }
+    .metrics { display: flex; gap: 8px; margin: 16px 0; }
+    .metric { background: #f8f7f4; border-radius: 5px; flex: 1; padding: 9px; }
+    .metric small { color: var(--muted); display: block; font-size: 11px; }
+    .metric strong { display: block; font-size: 16px; margin-top: 2px; }
+    .btn, .topbar button {
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      background: var(--paper);
+      color: var(--ink);
+      padding: 8px 12px;
+    }
+    .btn:hover, .topbar button:hover { border-color: #b9b7b0; }
+    .btn.primary { background: var(--ink); border-color: var(--ink); color: #fff; }
+    .btn.primary:hover { background: #383838; }
+    .track .btn { align-self: flex-start; margin-top: auto; }
+
+    .block { margin-top: 28px; }
+    .block-head {
+      align-items: baseline;
+      display: flex;
+      gap: 14px;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .block-head .muted { font-size: 12px; text-align: right; }
+    #pca-image { display: block; height: auto; max-width: 100%; width: 100%; }
+    #pca-note { font-size: 13px; margin-top: 8px; }
+
+    .pill {
+      background: #f1f0ec;
+      border-radius: 999px;
+      color: #4d4d4d;
+      font-size: 12px;
+      padding: 4px 10px;
+    }
+    .form-layout { align-items: start; }
+    .form-grid { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; margin-top: 16px; }
+    .field label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 5px; }
     .field input, .field select {
       background: #fff;
-      border: 1px solid #d5dbe5;
+      border: 1px solid #cfcdc6;
       border-radius: 5px;
       color: var(--ink);
       padding: 8px;
       width: 100%;
     }
     .actions { display: flex; gap: 8px; margin-top: 16px; }
-    .primary { background: var(--ink); border-color: var(--ink); color: #fff; }
-    .primary:hover { background: #27344a; }
-    .result { min-height: 300px; }
-    .result-score { color: var(--blue); font-size: 50px; font-weight: 700; line-height: 1.1; margin: 24px 0 16px; }
-    .result-score span { color: var(--muted); font-size: 16px; font-weight: 400; }
-    .result-box { background: var(--blue-soft); border-radius: 6px; padding: 13px; }
-    .result-box p { color: var(--muted); margin-top: 4px; }
-    .error { color: var(--red); }
-    .success { color: var(--green); }
-    table { border-collapse: collapse; width: 100%; }
-    th, td { border-bottom: 1px solid var(--line); padding: 12px 8px; text-align: left; }
-    th { color: var(--muted); font-size: 11px; text-transform: uppercase; }
-    .quality-list { display: grid; gap: 8px; margin-top: 15px; }
-    .quality-list div { background: #f8fafc; border-radius: 6px; display: flex; justify-content: space-between; padding: 11px; }
-    .notes { color: var(--muted); line-height: 1.75; }
-    .notes h2 { color: var(--ink); margin: 22px 0 4px; }
-    .notes h2:first-child { margin-top: 0; }
+    .result { min-height: 240px; }
+    .big { color: var(--accent); font-size: 46px; font-weight: 650; line-height: 1.1; margin: 18px 0 12px; }
+    .big span { color: var(--muted); font-size: 15px; font-weight: 400; }
+    .result p { color: var(--muted); }
+    .result p b { color: var(--ink); }
+    .error { color: var(--bad); }
 
-    @media (max-width: 980px) {
-      .sidebar { width: 190px; flex-basis: 190px; }
-      .kpis { grid-template-columns: repeat(2, 1fr); }
-      .form-layout { grid-template-columns: 1fr; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border-bottom: 1px solid var(--line); padding: 9px 6px; text-align: left; vertical-align: top; }
+    th { color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; }
+    tr:last-child th, tr:last-child td { border-bottom: 0; }
+    .kv th { font-size: 12px; font-weight: 600; text-transform: none; width: 55%; }
+    .kv td { font-variant-numeric: tabular-nums; }
+    .table-card { margin-top: 14px; }
+    .issues { color: var(--muted); font-size: 14px; }
+    .issues ul { margin: 8px 0 0; padding-left: 18px; }
+    .notes p { color: var(--muted); margin-top: 6px; }
+    .notes h2 { margin-top: 20px; }
+    .notes h2:first-child { margin-top: 0; }
+    code {
+      background: #f1f0ec;
+      border-radius: 3px;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 12px;
+      padding: 1px 4px;
     }
-    @media (max-width: 650px) {
-      .layout { display: block; }
-      .sidebar { border-bottom: 1px solid var(--line); border-right: 0; padding: 18px; width: auto; }
-      .brand { margin-bottom: 19px; }
-      .nav { grid-template-columns: repeat(2, 1fr); }
-      .dataset-note { display: none; }
-      .header { padding: 0 16px; }
-      .content { padding: 22px 16px; }
-      .header small { display: none; }
-      .two, .kpis, .form-grid { grid-template-columns: 1fr; }
-      .feature { grid-template-columns: 130px 1fr 43px; }
+
+    @media (max-width: 900px) {
+      .cards { grid-template-columns: 1fr 1fr; }
+      .two-col { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 640px) {
+      .shell { display: block; }
+      .sidebar { border-bottom: 1px solid var(--line); border-right: 0; padding: 16px; width: auto; }
+      .brand { margin-bottom: 14px; }
+      .nav { grid-template-columns: 1fr 1fr; }
+      .side-note { display: none; }
+      .topbar { padding: 0 16px; }
+      .content { padding: 22px 16px 48px; }
+      .cards, .form-grid { grid-template-columns: 1fr; }
+      .block-head { display: block; }
+      .block-head .muted { display: block; text-align: left; margin-top: 3px; }
     }
   </style>
 </head>
 <body>
-  <div class="layout">
+  <div class="shell">
     <aside class="sidebar">
-      <div>
-        <div class="brand"><strong>Student Performance Analytics</strong><span>Machine-learning project</span></div>
-        <div class="nav-label">Navigate</div>
-        <nav class="nav">
-          <button data-view="overview" class="active">Overview</button>
-          <button data-view="exam">Exam score</button>
-          <button data-view="placement">Placement</button>
-          <button data-view="models">Model results</button>
-          <button data-view="quality">Data quality</button>
-          <button data-view="notes">Notes</button>
-        </nav>
+      <div class="brand">
+        <b>Student Performance Analytics</b>
+        <span>Course project</span>
       </div>
-      <div class="dataset-note">Independent source tracks<strong>Exam + placement</strong>No verified student-level link</div>
+      <nav class="nav">
+        <button data-view="overview" class="active">Overview</button>
+        <button data-view="exam">Exam score</button>
+        <button data-view="placement">Placement</button>
+        <button data-view="quality">Data quality</button>
+        <button data-view="models">Model results</button>
+        <button data-view="notes">Notes</button>
+      </nav>
+      <div class="side-note">
+        <b>Two separate datasets</b>
+        The exam and placement files do not share a student ID. Their results are kept apart.
+      </div>
     </aside>
 
-    <div class="main">
-      <header class="header"><small>Student Performance Analytics / <b>Dashboard</b></small><button id="export">Print report</button></header>
-      <main class="content">
+    <main>
+      <div class="topbar">
+        <span id="page-name">Overview</span>
+        <button id="print" type="button">Print page</button>
+      </div>
+
+      <div class="content">
         <section id="overview" class="view">
-          <div class="intro"><h1>Student performance analytics</h1><p>Explore the project data and try its baseline prediction models.</p></div>
-          <div class="notice"><strong>Important limitation</strong><p>The two source datasets do not belong to verified records of the same students. They were paired by row order for experimentation. Results are not ready for real student decisions.</p></div>
-          <div class="grid kpis">
-            <div class="card"><span class="kpi-label">Exam records</span><div class="kpi-value" id="rows">—</div><span class="kpi-note">Exam-score source track</span></div>
-            <div class="card"><span class="kpi-label">Average exam score</span><div class="kpi-value" id="exam-mean">—</div><span class="kpi-note">Out of 100</span></div>
-            <div class="card"><span class="kpi-label">Unplaced records</span><div class="kpi-value" id="unplaced">—</div><span class="kpi-note">Placement class 0</span></div>
-            <div class="card"><span class="kpi-label">Placed records</span><div class="kpi-value" id="placed">—</div><span class="kpi-note">Placement class 1</span></div>
+          <div class="page-head">
+            <h1>Student performance data</h1>
+            <p>Two datasets, two models, reported separately. Every number on this page is read from the generated project files.</p>
           </div>
-          <div class="grid two" style="margin-top:14px">
-            <article class="card track track-blue"><span class="label">Exam source track · regression</span><h2>Exam score prediction</h2><p>Uses the saved Linear Regression model to estimate a score from exam-source factors.</p><div class="metric-row" id="exam-metrics"></div><button class="button primary" data-go="exam">Try prediction</button></article>
-            <article class="card track track-green"><span class="label">Placement source track · classification</span><h2>Placement prediction</h2><p>Uses independent placement-source fields. It is not a prediction for the exam records.</p><div class="metric-row" id="placement-metrics"></div><button class="button primary" data-go="placement">Try prediction</button></article>
+
+          <div class="warning">
+            <b>These are not linked student records.</b>
+            <p id="link-warning">The exam file has no identifier column. The placement file has <code>College_ID</code>, which does not exist in the exam file. No shared student or college key exists, so the tracks are modelled separately. The earlier row-order pairing has been removed.</p>
           </div>
-          <div class="section-heading"><h2>Selected features</h2><span class="subtle">From training-only feature selection</span></div>
-          <div class="card features"><div class="feature"><b>Attendance</b><div class="bar"><i style="width:100%"></i></div><span>Exam source</span></div><div class="feature"><b>Hours studied</b><div class="bar"><i style="width:82%"></i></div><span>Exam source</span></div><div class="feature"><b>Previous scores</b><div class="bar"><i style="width:56%"></i></div><span>Exam source</span></div><div class="feature"><b>CGPA</b><div class="bar green"><i style="width:100%"></i></div><span>Placement source</span></div><div class="feature"><b>Communication skills</b><div class="bar green"><i style="width:58%"></i></div><span>Placement source</span></div></div>
-          <div class="section-heading"><h2>Two-component PCA</h2><span class="subtle">Fit on training features only</span></div>
-          <div class="card"><img src="/api/pca/visualization" alt="PCA visualization for independent test splits" style="max-width:100%"><p class="subtle">Separate PCA views for the exam and placement tracks; colors show each track's target.</p></div>
+
+          <div class="cards">
+            <div class="card stat"><span>Exam records</span><b id="stat-exam-rows">—</b><small id="stat-exam-cols"></small></div>
+            <div class="card stat"><span>Average exam score</span><b id="stat-exam-mean">—</b><small id="stat-exam-range"></small></div>
+            <div class="card stat"><span>Placement records</span><b id="stat-placement-rows">—</b><small id="stat-placement-cols"></small></div>
+            <div class="card stat"><span>Placed share</span><b id="stat-placement-rate">—</b><small id="stat-placement-counts"></small></div>
+          </div>
+
+          <div class="two-col">
+            <article class="card track">
+              <span class="eyebrow">Exam dataset</span>
+              <h2>Exam score</h2>
+              <p>Regression on attendance, study hours, previous scores, and other exam-file fields.</p>
+              <div class="metrics" id="exam-metrics"></div>
+              <button class="btn primary" data-go="exam" type="button">Open exam page</button>
+            </article>
+            <article class="card track">
+              <span class="eyebrow">Placement dataset</span>
+              <h2>Placement</h2>
+              <p>Classification on CGPA, communication skills, IQ, and other placement-file fields. The label is deterministic in this source, so a depth-limited Random Forest is used instead of advertising a perfect score.</p>
+              <div class="metrics" id="placement-metrics"></div>
+              <button class="btn primary" data-go="placement" type="button">Open placement page</button>
+            </article>
+          </div>
+
+          <section class="block">
+            <div class="block-head">
+              <h2>PCA</h2>
+              <span class="muted">Scaler and PCA fitted on the training split only</span>
+            </div>
+            <div class="card">
+              <img id="pca-image" src="/api/pca/visualization" alt="PCA scatter plots for the exam and placement test splits">
+              <p id="pca-note">Loading PCA summary…</p>
+            </div>
+          </section>
         </section>
 
         <section id="exam" class="view hidden">
-          <div class="page-heading"><div><h1>Exam score prediction</h1><p class="subtle">Enter a demo profile to call the saved Linear Regression model.</p></div><span class="label">MAE 0.9194 · R² 0.6974</span></div>
-          <div class="grid form-layout"><form class="card" id="exam-form"><h2>Student inputs</h2><p class="subtle">The starting values are example inputs, not a real student record.</p><div class="form-grid">
-            <div class="field"><label>Hours studied / week</label><input name="hours_studied" type="number" min="0" max="50" value="24" required></div>
-            <div class="field"><label>Attendance (%)</label><input name="attendance" type="number" min="0" max="100" value="88" required></div>
-            <div class="field"><label>Previous scores</label><input name="previous_scores" type="number" min="0" max="100" value="74" required></div>
-            <div class="field"><label>Tutoring sessions</label><input name="tutoring_sessions" type="number" min="0" max="10" value="3" required></div>
-            <div class="field"><label>Access to resources</label><select name="access_to_resources"><option value="0">Low</option><option value="1" selected>Medium</option><option value="2">High</option></select></div>
-            <div class="field"><label>Parental involvement</label><select name="parental_involvement"><option value="0">Low</option><option value="1" selected>Medium</option><option value="2">High</option></select></div>
-            <div class="field"><label>Parental education</label><select name="parental_education_level"><option value="0">High School</option><option value="1" selected>College</option><option value="2">Postgraduate</option></select></div>
-            <div class="field"><label>Family income</label><select name="family_income"><option value="0">Low</option><option value="1" selected>Medium</option><option value="2">High</option></select></div>
-          </div><div class="actions"><button class="button primary" type="submit">Predict score</button><button class="button" type="reset">Reset</button></div></form><div class="card result" id="exam-result"><span class="label">Prediction</span><div class="result-score">— <span>/ 100</span></div><div class="result-box"><h3>Waiting for input</h3><p>Submit the form to call the real saved model.</p></div></div></div>
+          <div class="page-head">
+            <h1>Exam score</h1>
+            <p>This form uses the exam dataset only. The default values are examples, not a real student record.</p>
+          </div>
+          <div class="two-col form-layout">
+            <form class="card" id="exam-form">
+              <span class="eyebrow">Model</span>
+              <h2 id="exam-model-name">Linear Regression</h2>
+              <div class="form-grid">
+                <div class="field"><label for="exam-hours">Hours studied per week</label><input id="exam-hours" name="hours_studied" type="number" min="0" max="50" value="24" required></div>
+                <div class="field"><label for="exam-attendance">Attendance (%)</label><input id="exam-attendance" name="attendance" type="number" min="0" max="100" value="88" required></div>
+                <div class="field"><label for="exam-previous">Previous scores</label><input id="exam-previous" name="previous_scores" type="number" min="0" max="100" value="74" required></div>
+                <div class="field"><label for="exam-tutoring">Tutoring sessions</label><input id="exam-tutoring" name="tutoring_sessions" type="number" min="0" max="10" value="3" required></div>
+                <div class="field"><label for="exam-resources">Access to resources</label><select id="exam-resources" name="access_to_resources"><option value="Low">Low</option><option value="Medium" selected>Medium</option><option value="High">High</option></select></div>
+                <div class="field"><label for="exam-involvement">Parental involvement</label><select id="exam-involvement" name="parental_involvement"><option value="Low">Low</option><option value="Medium" selected>Medium</option><option value="High">High</option></select></div>
+                <div class="field"><label for="exam-education">Parental education</label><select id="exam-education" name="parental_education_level"><option value="High School">High School</option><option value="College" selected>College</option><option value="Postgraduate">Postgraduate</option></select></div>
+                <div class="field"><label for="exam-income">Family income</label><select id="exam-income" name="family_income"><option value="Low">Low</option><option value="Medium" selected>Medium</option><option value="High">High</option></select></div>
+              </div>
+              <div class="actions">
+                <button class="btn primary" type="submit">Predict score</button>
+                <button class="btn" type="reset">Reset</button>
+              </div>
+            </form>
+            <div class="card result" id="exam-result">
+              <span class="eyebrow">Result</span>
+              <h3>Waiting for input</h3>
+              <p>Submit the form to call the saved model.</p>
+            </div>
+          </div>
         </section>
 
         <section id="placement" class="view hidden">
-          <div class="page-heading"><div><h1>Placement prediction</h1><p class="subtle">Enter a demo profile to call the saved Random Forest model.</p></div><span class="label">Experimental · F1 0.9935</span></div>
-          <div class="grid form-layout"><form class="card" id="placement-form"><h2>Student inputs</h2><p class="subtle">The starting values are example inputs, not a real student record.</p><div class="form-grid">
-            <div class="field"><label>CGPA (0–10)</label><input name="cgpa" type="number" min="0" max="10" step=".01" value="8.45" required></div>
-            <div class="field"><label>Communication skills (1–10)</label><input name="communication_skills" type="number" min="1" max="10" value="8" required></div>
-            <div class="field"><label>Previous semester result</label><input name="prev_sem_result" type="number" min="0" max="10" step=".1" value="8.2" required></div>
-            <div class="field"><label>IQ</label><input name="iq" type="number" min="70" max="160" value="115" required></div>
-            <div class="field"><label>Projects completed</label><input name="projects_completed" type="number" min="0" max="10" value="4" required></div>
-            <div class="field"><label>Academic performance (0–10)</label><input name="academic_performance" type="number" min="0" max="10" value="8" required></div>
-            <div class="field"><label>Extra-curricular score</label><input name="extra_curricular_score" type="number" min="0" max="10" value="7" required></div>
-            <div class="field"><label>Internship experience</label><select name="internship_experience"><option value="0" selected>No</option><option value="1">Yes</option></select></div>
-          </div><div class="actions"><button class="button primary" type="submit">Predict placement</button><button class="button" type="reset">Reset</button></div></form><div class="card result" id="placement-result"><span class="label">Prediction</span><div class="result-score">— <span>probability</span></div><div class="result-box"><h3>Waiting for input</h3><p>Submit the form to call the real saved model.</p></div></div></div>
+          <div class="page-head">
+            <h1>Placement</h1>
+            <p>This form uses the placement dataset only. It does not describe a student in the exam dataset.</p>
+          </div>
+          <div class="two-col form-layout">
+            <form class="card" id="placement-form">
+              <span class="eyebrow">Model</span>
+              <h2 id="placement-model-name">Random Forest Classifier</h2>
+              <div class="form-grid">
+                <div class="field"><label for="place-cgpa">CGPA (0–10)</label><input id="place-cgpa" name="cgpa" type="number" min="0" max="10" step="0.01" value="8.45" required></div>
+                <div class="field"><label for="place-communication">Communication skills (1–10)</label><input id="place-communication" name="communication_skills" type="number" min="1" max="10" value="8" required></div>
+                <div class="field"><label for="place-prev">Previous semester result</label><input id="place-prev" name="prev_sem_result" type="number" min="0" max="10" step="0.1" value="8.2" required></div>
+                <div class="field"><label for="place-iq">IQ</label><input id="place-iq" name="iq" type="number" min="70" max="160" value="115" required></div>
+                <div class="field"><label for="place-projects">Projects completed</label><input id="place-projects" name="projects_completed" type="number" min="0" max="10" value="4" required></div>
+                <div class="field"><label for="place-academic">Academic performance (0–10)</label><input id="place-academic" name="academic_performance" type="number" min="0" max="10" value="8" required></div>
+                <div class="field"><label for="place-extra">Extra-curricular score (0–10)</label><input id="place-extra" name="extra_curricular_score" type="number" min="0" max="10" value="7" required></div>
+                <div class="field"><label for="place-internship">Internship experience</label><select id="place-internship" name="internship_experience"><option value="No" selected>No</option><option value="Yes">Yes</option></select></div>
+              </div>
+              <div class="actions">
+                <button class="btn primary" type="submit">Predict placement</button>
+                <button class="btn" type="reset">Reset</button>
+              </div>
+            </form>
+            <div class="card result" id="placement-result">
+              <span class="eyebrow">Result</span>
+              <h3>Waiting for input</h3>
+              <p>Submit the form to call the saved model.</p>
+            </div>
+          </div>
         </section>
 
-        <section id="models" class="view hidden"><div class="page-heading"><div><h1>Model results</h1><p class="subtle">Metrics generated by the repository's test-set analysis.</p></div><button class="button" onclick="loadMetrics()">Refresh</button></div><div class="card"><table><thead><tr><th>Task</th><th>Model</th><th>Primary metrics</th></tr></thead><tbody id="metrics-body"></tbody></table></div><div class="notice"><strong>Interpretation</strong><p>Random Forest placement performance is unusually high. Treat it as an experiment requiring repeated validation, not as proof of real-world accuracy.</p></div></section>
-        <section id="quality" class="view hidden"><div class="page-heading"><div><h1>Data quality</h1><p class="subtle">Generated checks for the independent source tracks.</p></div></div><div class="grid two"><div class="card"><h2>Exam source track</h2><div class="quality-list"><div><span>Rows</span><b id="q-rows">—</b></div><div><span>Columns</span><b id="q-cols">—</b></div><div><span>Missing values</span><b id="q-nulls">—</b></div><div><span>Duplicate rows</span><b id="q-dupes">—</b></div><div><span>Exam score range</span><b id="q-range">—</b></div></div></div><div class="card"><h2>Linkage status</h2><p class="notes"><b class="error">Not genuinely linked.</b> The source files do not share a student identifier. Any row-order pairing is retained only as an experimental artifact and excluded from the main modeling workflow.</p></div></div></section>
-        <section id="notes" class="view hidden"><div class="page-heading"><div><h1>Project notes</h1><p class="subtle">What this project is, and what it is not.</p></div></div><div class="card notes"><h2>What it does</h2><p>It estimates exam scores and placement outcomes from student-related fields using two baseline machine-learning models.</p><h2>What is complete</h2><p>Data preparation, exploratory analysis, train/validation/test splits, baseline training, metrics, and structural checks are implemented.</p><h2>What is left</h2><p>Use genuinely linked student records, add repeated cross-validation, explainability, fairness checks, authentication, saved prediction history, and a production deployment process.</p></div></section>
-      </main>
-    </div>
+        <section id="quality" class="view hidden">
+          <div class="page-head">
+            <h1>Data quality</h1>
+            <p>Generated by <code>scripts/data_quality.py</code> from the raw, processed, and split files.</p>
+          </div>
+
+          <div class="cards">
+            <div class="card stat"><span>Genuine student link</span><b id="q-linked">—</b><small id="q-link-note"></small></div>
+            <div class="card stat"><span>Row-order pairing</span><b id="q-synthetic">—</b><small id="q-synthetic-note"></small></div>
+            <div class="card stat"><span>Split row check</span><b id="q-splits">—</b><small id="q-splits-note"></small></div>
+            <div class="card stat"><span>Exam score range</span><b id="q-exam-range">—</b><small>After preprocessing</small></div>
+          </div>
+
+          <div class="two-col">
+            <div class="card">
+              <h2>Exam dataset</h2>
+              <table class="kv"><tbody id="q-exam"></tbody></table>
+            </div>
+            <div class="card">
+              <h2>Placement dataset</h2>
+              <table class="kv"><tbody id="q-placement"></tbody></table>
+            </div>
+          </div>
+
+          <div class="card table-card">
+            <h2>Train, validation, and test rows</h2>
+            <table>
+              <thead><tr><th>Track</th><th>Train</th><th>Validation</th><th>Test</th><th>Total</th></tr></thead>
+              <tbody id="q-splits-body"></tbody>
+            </table>
+          </div>
+
+          <div class="card table-card">
+            <h2>Preprocessing and range checks</h2>
+            <div class="issues" id="q-issues">Loading…</div>
+          </div>
+        </section>
+
+        <section id="models" class="view hidden">
+          <div class="page-head">
+            <h1>Model results</h1>
+            <p>Test-set metrics, five-fold cross-validation, and training-versus-test checks from the generated metric files.</p>
+          </div>
+          <div class="card">
+            <table>
+              <thead><tr><th>Track</th><th>Model</th><th>Metrics</th></tr></thead>
+              <tbody id="models-body"></tbody>
+            </table>
+          </div>
+
+          <div class="card table-card">
+            <h2>5-fold cross-validation</h2>
+            <p class="muted">Mean ± standard deviation across folds of the training split. Preprocessing is refitted inside each fold.</p>
+            <table>
+              <thead><tr><th>Track</th><th>Model</th><th>Metrics</th></tr></thead>
+              <tbody id="cv-body"></tbody>
+            </table>
+          </div>
+
+          <div class="card table-card">
+            <h2>Training vs test overfitting check</h2>
+            <p class="muted">Positive gaps mean the training score is better than the held-out score.</p>
+            <table>
+              <thead><tr><th>Track</th><th>Model</th><th>Headline gap</th><th>Status</th></tr></thead>
+              <tbody id="overfit-body"></tbody>
+            </table>
+          </div>
+
+          <div class="card table-card">
+            <h2>Why the placement score is high</h2>
+            <div class="issues" id="investigation-body">Loading investigation…</div>
+          </div>
+
+          <div class="warning">
+            <b>The placement label is deterministic in this source dataset.</b>
+            <p>At least three of four threshold conditions reproduce the label exactly. An unconstrained Random Forest therefore reaches 1.0. The deployed forest is capacity-limited to depth 2, so its scores describe an honest benchmark rather than real-world placement accuracy.</p>
+          </div>
+        </section>
+
+        <section id="notes" class="view hidden">
+          <div class="page-head">
+            <h1>Notes</h1>
+            <p>What this project does, and what it does not do.</p>
+          </div>
+          <div class="card notes">
+            <h2>Scope</h2>
+            <p>The project prepares two unrelated datasets, trains baseline models, and reports their test-set metrics. Exam score is a regression task. Placement is a binary classification task.</p>
+
+            <h2>Data limitation</h2>
+            <p>The exam file has no student identifier. The placement file has <code>College_ID</code>, but the exam file has no matching column. No row-order combined file exists in this version. Each track is split into train, validation, and test sets independently.</p>
+
+            <h2>Preprocessing and validation</h2>
+            <p>Imputation, scaling, and one-hot encoding live inside each scikit-learn pipeline and are fitted on the training split only. Every model is also evaluated with five-fold cross-validation. Training-versus-test gaps are written to <code>outputs/metrics/overfitting_analysis.csv</code>.</p>
+
+            <h2>What is not claimed</h2>
+            <p>No student-level link is claimed. No production accuracy is claimed. The placement label is deterministic in the source dataset; the investigation report explains why an unrestricted forest reaches a perfect score and why the deployed model is deliberately capacity-limited.</p>
+
+            <h2>How to rebuild</h2>
+            <p>Run the commands from the repository root:</p>
+            <p><code>python scripts/preprocess.py</code><br>
+            <code>python scripts/dataset_checks.py</code><br>
+            <code>python scripts/select_and_split.py</code><br>
+            <code>python scripts/data_quality.py</code><br>
+            <code>python scripts/pca_analysis.py</code><br>
+            <code>python scripts/run_eda.py</code><br>
+            <code>python scripts/train_baselines.py</code><br>
+            <code>python scripts/analyze_baselines.py</code></p>
+            <p>Then start the app with <code>python app.py</code>.</p>
+          </div>
+        </section>
+      </div>
+    </main>
   </div>
+
   <script>
     const $ = (selector) => document.querySelector(selector);
     const all = (selector) => document.querySelectorAll(selector);
+    const labels = {
+      overview: "Overview",
+      exam: "Exam score",
+      placement: "Placement",
+      quality: "Data quality",
+      models: "Model results",
+      notes: "Notes",
+    };
+
     function show(view) {
       all(".view").forEach((item) => item.classList.toggle("hidden", item.id !== view));
       all(".nav button").forEach((item) => item.classList.toggle("active", item.dataset.view === view));
+      $("#page-name").textContent = labels[view] || "";
       if (location.hash !== `#${view}`) history.replaceState(null, "", `#${view}`);
     }
+
     all(".nav button").forEach((button) => button.addEventListener("click", () => show(button.dataset.view)));
     all("[data-go]").forEach((button) => button.addEventListener("click", () => show(button.dataset.go)));
-    const formValues = (form) => Object.fromEntries(new FormData(form).entries());
+    $("#print").addEventListener("click", () => window.print());
+
     async function api(url, options) {
       const response = await fetch(url, options);
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Request failed");
       return data;
     }
+
+    const int = (value) => (value == null ? "—" : Number(value).toLocaleString());
+    const dec = (value, digits = 2) => (value == null ? "—" : Number(value).toFixed(digits));
+    const pct = (value, digits = 1) => (value == null ? "—" : `${(Number(value) * 100).toFixed(digits)}%`);
+    const kv = (label, value) => `<tr><th>${label}</th><td>${value}</td></tr>`;
+    const tile = (label, value) => `<div class="metric"><small>${label}</small><strong>${value}</strong></div>`;
+
     async function loadSummary() {
       const data = await api("/api/summary");
-      $("#rows").textContent = data.exam_rows.toLocaleString();
-      $("#exam-mean").textContent = data.exam_mean;
-      $("#unplaced").textContent = data.placement_unplaced.toLocaleString();
-      $("#placed").textContent = data.placement_placed.toLocaleString();
-      $("#q-rows").textContent = data.exam_rows.toLocaleString();
-      $("#q-cols").textContent = data.exam_columns;
-      $("#q-nulls").textContent = data.exam_nulls;
-      $("#q-dupes").textContent = data.exam_duplicates;
-      $("#q-range").textContent = `${data.exam_min}–${data.exam_max}`;
+      $("#link-warning").textContent = data.investigation ||
+        "No shared student identifier was found between the two source files.";
+      $("#stat-exam-rows").textContent = int(data.exam_rows);
+      $("#stat-exam-cols").textContent = `${int(data.exam_columns)} columns after encoding`;
+      $("#stat-exam-mean").textContent = dec(data.exam_mean, 2);
+      $("#stat-exam-range").textContent = `Range ${data.exam_min} to ${data.exam_max}`;
+      $("#stat-placement-rows").textContent = int(data.placement_rows);
+      $("#stat-placement-cols").textContent = `${int(data.placement_columns)} columns after encoding`;
+      $("#stat-placement-rate").textContent = pct(data.placement_rate);
+      $("#stat-placement-counts").textContent =
+        `${int(data.placement_placed)} placed, ${int(data.placement_unplaced)} not placed`;
+      if (data.deployed_models) {
+        $("#exam-model-name").textContent = data.deployed_models.exam;
+        $("#placement-model-name").textContent = data.deployed_models.placement;
+      }
     }
+
     async function loadMetrics() {
       const rows = await api("/api/metrics");
-      const metric = (label, value) => `<div class="metric"><small>${label}</small><strong>${value}</strong></div>`;
-      const exam = rows.find((row) => row.task === "exam_score_regression");
-      const placement = rows.find((row) => row.task === "placement_classification");
-      if (exam) $("#exam-metrics").innerHTML = metric("MAE", exam.MAE.toFixed(4)) + metric("RMSE", exam.RMSE.toFixed(4)) + metric("R²", exam.R2.toFixed(4));
-      if (placement) $("#placement-metrics").innerHTML = metric("Accuracy", `${(placement.Accuracy * 100).toFixed(2)}%`) + metric("F1", `${(placement.F1 * 100).toFixed(2)}%`) + metric("ROC-AUC", placement.ROC_AUC.toFixed(4));
-      $("#metrics-body").innerHTML = rows.map((row) => {
+      const exam = rows.find((row) => row.task === "exam_score_regression" && row.model === "LinearRegression");
+      const logistic = rows.find((row) => row.task === "placement_classification" && row.model === "LogisticRegression");
+      const placement = rows.find((row) => row.task === "placement_classification" && row.model === "RandomForestClassifier");
+
+      if (exam) {
+        $("#exam-metrics").innerHTML =
+          tile("MAE", dec(exam.MAE, 3)) + tile("RMSE", dec(exam.RMSE, 3)) + tile("R²", dec(exam.R2, 3));
+      }
+      if (logistic && placement) {
+        $("#placement-metrics").innerHTML =
+          tile("F1 · logistic", pct(logistic.F1)) +
+          tile("ROC-AUC · logistic", dec(logistic.ROC_AUC, 3)) +
+          tile("F1 · random forest", pct(placement.F1));
+      }
+
+      $("#models-body").innerHTML = rows.map((row) => {
+        const track = row.task === "exam_score_regression" ? "Exam" : "Placement";
         const values = row.task.includes("regression")
-          ? `MAE ${row.MAE.toFixed(4)} · RMSE ${row.RMSE.toFixed(4)} · R² ${row.R2.toFixed(4)}`
-          : `Accuracy ${(row.Accuracy * 100).toFixed(2)}% · F1 ${(row.F1 * 100).toFixed(2)}% · ROC-AUC ${row.ROC_AUC.toFixed(4)}`;
-        return `<tr><td>${row.task}</td><td><b>${row.model}</b></td><td>${values}</td></tr>`;
+          ? `MAE ${dec(row.MAE, 4)} · RMSE ${dec(row.RMSE, 4)} · R² ${dec(row.R2, 4)}`
+          : `Accuracy ${pct(row.Accuracy)} · F1 ${pct(row.F1)} · ROC-AUC ${dec(row.ROC_AUC, 4)}`;
+        return `<tr><td>${track}</td><td>${row.model}</td><td>${values}</td></tr>`;
       }).join("");
     }
+
+    async function loadValidation() {
+      const [cvRows, overfit, investigation] = await Promise.all([
+        api("/api/cross-validation"),
+        api("/api/overfitting"),
+        api("/api/placement-investigation"),
+      ]);
+
+      const pm = (mean, std, digits = 3) =>
+        mean == null ? "—" : `${dec(mean, digits)} ± ${dec(std, digits)}`;
+
+      $("#cv-body").innerHTML = cvRows.map((row) => {
+        const track = row.task === "exam_score_regression" ? "Exam" : "Placement";
+        const values = row.task.includes("regression")
+          ? `MAE ${pm(row.cv_MAE_mean, row.cv_MAE_std, 3)} · RMSE ${pm(row.cv_RMSE_mean, row.cv_RMSE_std, 3)} · R² ${pm(row.cv_R2_mean, row.cv_R2_std, 3)}`
+          : `Accuracy ${pm(row.cv_Accuracy_mean, row.cv_Accuracy_std, 3)} · F1 ${pm(row.cv_F1_mean, row.cv_F1_std, 3)} · ROC-AUC ${pm(row.cv_ROC_AUC_mean, row.cv_ROC_AUC_std, 3)}`;
+        return `<tr><td>${track}</td><td>${row.model}</td><td>${values}</td></tr>`;
+      }).join("");
+
+      $("#overfit-body").innerHTML = overfit.summary.map((row) => {
+        const track = row.task === "exam_score_regression" ? "Exam" : "Placement";
+        const gap = Number(row.train_minus_test_gap);
+        const status = row.status === "review" ? "Review" : "OK";
+        return `<tr><td>${track}</td><td>${row.model}</td><td>${row.headline_metric} ${gap >= 0 ? "+" : ""}${gap.toFixed(3)}</td><td>${status}</td></tr>`;
+      }).join("");
+
+      const rule = investigation.deterministic_label_rule;
+      const unconstrained = investigation.unconstrained_random_forest;
+      const constrained = investigation.constrained_random_forest;
+      $("#investigation-body").innerHTML =
+        `<p>${rule.description}</p>` +
+        `<ul>` +
+        `<li>Rule accuracy on all ${int(rule.rows)} placement rows: ${pct(rule.accuracy, 2)} (${int(rule.errors)} errors).</li>` +
+        `<li>Majority-class baseline: ${pct(investigation.majority_class_baseline_accuracy, 2)}.</li>` +
+        `<li>Unconstrained Random Forest: accuracy ${pct(unconstrained.Accuracy, 2)}, F1 ${pct(unconstrained.F1, 2)}. Diagnostic only.</li>` +
+        `<li>Deployed depth-limited Random Forest: accuracy ${pct(constrained.Accuracy, 2)}, F1 ${pct(constrained.F1, 2)}.</li>` +
+        `</ul><p>${investigation.conclusion}</p>`;
+    }
+
+    async function loadQuality() {
+      const report = await api("/api/data-quality");
+      const exam = report.datasets.exam_processed;
+      const examRaw = report.datasets.exam_raw;
+      const placement = report.datasets.placement_processed;
+      const placementRaw = report.datasets.placement_raw;
+      const link = report.linkage;
+
+      $("#q-linked").textContent = link.genuinely_linked ? "Yes" : "No";
+      $("#q-link-note").textContent = link.shared_student_identifier
+        ? `Shared key: ${link.shared_student_identifier}`
+        : "No shared student identifier.";
+      $("#q-synthetic").textContent = link.row_order_pairing_status === "removed" ? "Removed" : "Not used";
+      $("#q-synthetic-note").textContent = "No combined dataset or synthetic pair ID exists.";
+      const matches = Object.values(report.split_row_totals || {}).every((item) => item.matches_processed);
+      $("#q-splits").textContent = matches ? "Match" : "Mismatch";
+      $("#q-splits-note").textContent = "Split rows equal processed rows.";
+      $("#q-exam-range").textContent =
+        `${exam.target_summary.min} to ${exam.target_summary.max}`;
+
+      $("#q-exam").innerHTML =
+        kv("Raw rows", int(examRaw.rows)) +
+        kv("Processed rows", int(exam.rows)) +
+        kv("Columns after encoding", int(exam.columns)) +
+        kv("Missing values", int(exam.missing_values_total)) +
+        kv("Duplicate rows", int(exam.duplicate_rows)) +
+        kv("Exam score mean", dec(exam.target_summary.mean, 2)) +
+        kv("Exam score std", dec(exam.target_summary.std, 2));
+
+      const classes = placement.target_summary.counts || {};
+      $("#q-placement").innerHTML =
+        kv("Raw rows", int(placementRaw.rows)) +
+        kv("Processed rows", int(placement.rows)) +
+        kv("Columns after encoding", int(placement.columns)) +
+        kv("Missing values", int(placement.missing_values_total)) +
+        kv("Duplicate rows", int(placement.duplicate_rows)) +
+        kv("Not placed (0)", int(classes["0"] || 0)) +
+        kv("Placed (1)", int(classes["1"] || 0)) +
+        kv("Placed share", pct(placement.target_summary.positive_share));
+
+      $("#q-splits-body").innerHTML = ["exam_score", "placement"].map((track) => {
+        const split = report.splits[track];
+        const total = split.train.rows + split.val.rows + split.test.rows;
+        return `<tr><td>${track === "exam_score" ? "Exam" : "Placement"}</td><td>${int(split.train.rows)}</td><td>${int(split.val.rows)}</td><td>${int(split.test.rows)}</td><td>${int(total)}</td></tr>`;
+      }).join("");
+
+      const issues = [];
+      for (const [name, ranges] of Object.entries(report.invalid_ranges || {})) {
+        for (const [column, count] of Object.entries(ranges)) {
+          issues.push(`${name}: ${column} had ${int(count)} value(s) outside the allowed range.`);
+        }
+      }
+      for (const [name, columns] of Object.entries(report.unexpected_categories || {})) {
+        for (const [column, values] of Object.entries(columns)) {
+          issues.push(`${name}: ${column} had unexpected categories: ${values.join(", ")}.`);
+        }
+      }
+
+      const processing = report.processing || {};
+      const pieces = [];
+      if (processing.exam) {
+        pieces.push(`Exam: removed ${int(processing.exam.incomplete_rows_removed)} incomplete rows and ${int(processing.exam.duplicates_removed)} duplicate rows; bounded ${int(processing.exam.exam_scores_bounded)} exam score(s).`);
+      }
+      if (processing.placement) {
+        pieces.push(`Placement: removed ${int(processing.placement.duplicates_removed)} duplicate rows; bounded ${int(processing.placement.cgpa_values_bounded)} CGPA value(s).`);
+      }
+      const issueHtml = issues.length
+        ? `<b>Raw-file findings (handled during preprocessing):</b><ul>${issues.map((item) => `<li>${item}</li>`).join("")}</ul>`
+        : "<p>No invalid ranges or unexpected categories were found.</p>";
+      $("#q-issues").innerHTML = `<p>${pieces.join(" ")}</p>${issueHtml}`;
+    }
+
+    async function loadPca() {
+      try {
+        const report = await api("/api/pca");
+        const exam = report.exam_score;
+        const placement = report.placement;
+        $("#pca-note").textContent =
+          `Exam track: PC1 explains ${(exam.explained_variance_ratio[0] * 100).toFixed(1)}% and PC2 ${(exam.explained_variance_ratio[1] * 100).toFixed(1)}%. ` +
+          `Placement track: PC1 ${(placement.explained_variance_ratio[0] * 100).toFixed(1)}% and PC2 ${(placement.explained_variance_ratio[1] * 100).toFixed(1)}%. ` +
+          "Colors show each track's target. Targets were not used to fit PCA.";
+      } catch (error) {
+        $("#pca-image").style.display = "none";
+        $("#pca-note").textContent = "PCA output is not available. Run python scripts/pca_analysis.py.";
+      }
+    }
+
     $("#exam-form").addEventListener("submit", async (event) => {
       event.preventDefault();
       const result = $("#exam-result");
       try {
-        const data = await api("/api/predict/exam", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(formValues(event.target)) });
-        result.innerHTML = `<span class="label">Prediction</span><div class="result-score">${data.rounded_score} <span>/ 100</span></div><div class="result-box"><h3>${data.tier} performance</h3><p>Estimated interval: ${data.interval[0]}–${data.interval[1]} points. Model: ${data.model}.</p></div>`;
-      } catch (error) { result.innerHTML = `<div class="result-box error">${error.message}</div>`; }
+        const data = await api("/api/predict/exam", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(Object.fromEntries(new FormData(event.target).entries())),
+        });
+        const interval = data.interval
+          ? `Estimated interval: ${data.interval[0]} to ${data.interval[1]} points (${data.interval_basis}).`
+          : "No interval is available because the metrics file is missing.";
+        result.innerHTML =
+          `<span class="eyebrow">Result</span>` +
+          `<div class="big">${data.rounded_score}<span>/100</span></div>` +
+          `<p><b>${data.tier}.</b> ${interval}</p>` +
+          `<p>Model: ${data.model}. The exam dataset is independent of the placement dataset.</p>`;
+      } catch (error) {
+        result.innerHTML = `<span class="eyebrow">Result</span><p class="error">${error.message}</p>`;
+      }
     });
+
     $("#placement-form").addEventListener("submit", async (event) => {
       event.preventDefault();
       const result = $("#placement-result");
       try {
-        const data = await api("/api/predict/placement", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(formValues(event.target)) });
-        result.innerHTML = `<span class="label">Prediction</span><div class="result-score ${data.placed ? "success" : "error"}">${data.percentage}% <span>probability</span></div><div class="result-box"><h3>${data.placed ? "Likely placement" : "Placement risk"}</h3><p>${data.warning}</p></div>`;
-      } catch (error) { result.innerHTML = `<div class="result-box error">${error.message}</div>`; }
+        const data = await api("/api/predict/placement", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(Object.fromEntries(new FormData(event.target).entries())),
+        });
+        result.innerHTML =
+          `<span class="eyebrow">Result</span>` +
+          `<div class="big">${data.percentage}<span>% probability</span></div>` +
+          `<p><b>${data.placed ? "Likely placed" : "Likely not placed"}.</b> ${data.warning}</p>` +
+          `<p>Model: ${data.model}.</p>`;
+      } catch (error) {
+        result.innerHTML = `<span class="eyebrow">Result</span><p class="error">${error.message}</p>`;
+      }
     });
-    $("#export").addEventListener("click", () => window.print());
-    loadSummary();
-    loadMetrics();
-    if (location.hash && document.getElementById(location.hash.slice(1))) show(location.hash.slice(1));
+
+    loadSummary().catch((error) => console.error(error));
+    loadMetrics().catch((error) => console.error(error));
+    loadValidation().catch((error) => {
+      $("#investigation-body").textContent =
+        "Validation output is not available. Run python scripts/train_baselines.py.";
+      console.error(error);
+    });
+    loadQuality().catch((error) => {
+      $("#q-issues").textContent = "Data-quality output is not available. Run python scripts/data_quality.py.";
+    });
+    loadPca();
+
+    if (location.hash && document.getElementById(location.hash.slice(1))) {
+      show(location.hash.slice(1));
+    }
   </script>
 </body>
 </html>
