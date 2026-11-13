@@ -7,6 +7,16 @@ This project analyzes student performance and placement outcomes using a two-tra
 - Regression track to predict Exam_Score
 - Classification track to predict Placement
 
+## Data reliability update
+
+The raw files were rechecked during the data-reliability pass. They do not
+share a student identifier: `StudentPerformanceFactors.csv` has no identifier
+column, while `College_ID` appears only in the placement file. The main
+preprocessing and splitting workflow now keeps the two tracks independent.
+The historical row-order combined file remains only as an explicitly labelled
+experimental artifact, so placement results must not be interpreted as
+outcomes for the exam records.
+
 ## What is Completed
 
 1. Data pipeline organization and dataset lineage

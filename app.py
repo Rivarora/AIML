@@ -1,17 +1,21 @@
 """Flask API and web server for the Student Performance Analytics dashboard."""
 
 from pathlib import Path
+import json
 
 import joblib
 import pandas as pd
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, send_file
 
 
 ROOT = Path(__file__).resolve().parent
 SPLITS_DIR = ROOT / "data" / "splits"
 MODELS_DIR = ROOT / "models"
-PROCESSED_FILE = ROOT / "data" / "processed" / "final_preprocessed_dataset.csv"
 METRICS_FILE = ROOT / "outputs" / "metrics" / "baseline_metrics.csv"
+EXAM_FILE = ROOT / "data" / "processed" / "exam_score_preprocessed.csv"
+PLACEMENT_FILE = ROOT / "data" / "processed" / "placement_preprocessed.csv"
+QUALITY_FILE = ROOT / "outputs" / "quality" / "data_quality.json"
+PCA_FILE = ROOT / "outputs" / "pca" / "pca_summary.json"
 
 app = Flask(__name__, template_folder="web")
 
@@ -59,25 +63,47 @@ def health():
 
 @app.get("/api/summary")
 def summary():
-    data = pd.read_csv(PROCESSED_FILE)
-    placement_counts = data["Placement"].value_counts().to_dict()
+    exam = pd.read_csv(EXAM_FILE)
+    placement = pd.read_csv(PLACEMENT_FILE)
+    placement_counts = placement["Placement"].value_counts().to_dict()
     return jsonify(
         {
-            "rows": int(len(data)),
-            "columns": int(len(data.columns)),
-            "nulls": int(data.isna().sum().sum()),
-            "duplicates": int(data.duplicated().sum()),
-            "exam_mean": round(float(data["Exam_Score"].mean()), 2),
-            "exam_std": round(float(data["Exam_Score"].std()), 2),
-            "exam_min": int(data["Exam_Score"].min()),
-            "exam_max": int(data["Exam_Score"].max()),
+            "exam_rows": int(len(exam)),
+            "exam_columns": int(len(exam.columns)),
+            "placement_rows": int(len(placement)),
+            "placement_columns": int(len(placement.columns)),
+            "exam_nulls": int(exam.isna().sum().sum()),
+            "placement_nulls": int(placement.isna().sum().sum()),
+            "exam_duplicates": int(exam.duplicated().sum()),
+            "placement_duplicates": int(placement.duplicated().sum()),
+            "exam_mean": round(float(exam["Exam_Score"].mean()), 2),
+            "exam_std": round(float(exam["Exam_Score"].std()), 2),
+            "exam_min": int(exam["Exam_Score"].min()),
+            "exam_max": int(exam["Exam_Score"].max()),
             "placement_unplaced": int(placement_counts.get(0, 0)),
             "placement_placed": int(placement_counts.get(1, 0)),
-            "placement_rate": round(float(data["Placement"].mean()), 4),
+            "placement_rate": round(float(placement["Placement"].mean()), 4),
             "exam_features": EXAM_FEATURES,
             "placement_features": PLACEMENT_FEATURES,
+            "source_records_genuinely_linked": False,
+            "synthetic_pairing_used": True,
         }
     )
+
+
+@app.get("/api/data-quality")
+def data_quality():
+    return jsonify(json.loads(QUALITY_FILE.read_text(encoding="utf-8")))
+
+
+@app.get("/api/pca")
+def pca():
+    return jsonify(json.loads(PCA_FILE.read_text(encoding="utf-8")))
+
+
+@app.get("/api/pca/visualization")
+def pca_visualization():
+    return send_file(ROOT / "outputs" / "pca" / "pca_visualization.png", mimetype="image/png")
 
 
 @app.get("/api/metrics")
@@ -126,9 +152,9 @@ def predict_placement():
             "Prev_Sem_Result": _number(payload, "prev_sem_result", 0, 10),
             "IQ": _number(payload, "iq", 70, 160),
             "Projects_Completed": _number(payload, "projects_completed", 0, 10),
-            "Peer_Negative": _number(payload, "peer_negative", 0, 1),
-            "Peer_Positive": _number(payload, "peer_positive", 0, 1),
-            "Academic_Performance": _number(payload, "academic_performance", 0, 5),
+            "Academic_Performance": _number(payload, "academic_performance", 0, 10),
+            "Extra_Curricular_Score": _number(payload, "extra_curricular_score", 0, 10),
+            "Internship_Experience": _number(payload, "internship_experience", 0, 1),
         }
         frame = _prediction_frame(values, PLACEMENT_FEATURES)
         prediction = int(PLACEMENT_MODEL.predict(frame)[0])

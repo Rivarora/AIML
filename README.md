@@ -30,10 +30,17 @@ pip install -r requirements.txt
 python scripts/preprocess.py
 python scripts/dataset_checks.py
 python scripts/select_and_split.py
+python scripts/data_quality.py
+python scripts/pca_analysis.py
 python scripts/run_eda.py
 python scripts/train_baselines.py
 python scripts/analyze_baselines.py
 ```
+
+The saved model files are generated artifacts and must be retrained when the
+scikit-learn version changes. The project pins scikit-learn to `1.9.0`; if
+startup reports an `InconsistentVersionWarning`, activate the project
+environment and rerun `python scripts/train_baselines.py`.
 
 ### 6) Run the interactive dashboard
 
@@ -53,8 +60,10 @@ Open `http://127.0.0.1:5000` in a browser. The dashboard includes:
 - Project limitations and research notes
 
 The API also exposes `/api/health`, `/api/summary`, `/api/metrics`,
-`/api/predict/exam`, and `/api/predict/placement`. Placement predictions remain
-experimental because the source datasets were paired synthetically.
+`/api/data-quality`, `/api/pca`, `/api/predict/exam`, and
+`/api/predict/placement`. Exam and placement records are independent source
+tracks; there is no shared student identifier. Placement predictions remain
+experimental and must not be interpreted as outcomes for the exam records.
 
 ### 4) Where outputs are generated
 
@@ -79,11 +88,12 @@ python train_baselines.py
 
 ## Team Ownership (Evaluation-1 Workflow)
 
-### Teammate 1 (already completed before this stage)
+### Teammate 1 (data reliability and preprocessing)
 
-- Collected raw datasets
-- Performed core preprocessing and dataset preparation
-- Built initial processed dataset used for splitting/modeling
+- Validates schemas, types, missing values, ranges, and categories before encoding
+- Keeps exam-score and placement workflows separate in the main modeling path
+- Generates machine-readable data-quality and training-only PCA artifacts
+- Retains row-order pairing only as an explicitly labelled experimental artifact
 
 ### Teammate 2 (completed in this stage)
 
@@ -243,9 +253,11 @@ Concepts:
 
 Implementation: `python scripts/preprocess.py`
 
-The script removes duplicate rows and drops incomplete student records. It
-writes `data/interim/StudentPerformanceFactors_clean.csv`. The one invalid
-`Exam_Score` value of 101 is clipped to the valid upper bound of 100.
+The script validates the raw schemas and categories, removes duplicates, records
+missing rows explicitly, and bounds `Exam_Score` to 0–100. It writes the
+independent model inputs `data/processed/exam_score_preprocessed.csv` and
+`data/processed/placement_preprocessed.csv`. Placement `CGPA` values above 10
+are bounded and counted in the provenance output.
 
 ### 3) Data Integration / Pair Construction
 
@@ -258,12 +270,12 @@ Output artifact:
 
 - data/interim/combined_synthetic_dataset.csv
 
-The current source files do not share a student identifier, so the script
-pairs the cleaned student rows with the first matching number of placement
-rows by row order and records a `synthetic_pair_id`. This is a synthetic
-dataset construction, not a real student-level join. The rows are not shuffled,
-so this pairing must not be interpreted as a relationship between the same
-students.
+The current source files do not share a student identifier: the exam source has
+no identifier column and `College_ID` has no counterpart in it. The main
+splitting and modeling workflow therefore does not join the datasets. A
+row-order `combined_synthetic_dataset.csv` is still emitted only for
+backwards-compatible experimental analysis and is never used by
+`select_and_split.py`.
 
 ### 4) Encoding and Final Preprocessing
 
@@ -273,7 +285,12 @@ Concepts:
 - Numeric consistency
 - Final feature matrix preparation
 
-Expected outputs:
+Expected independent outputs:
+
+- data/processed/exam_score_preprocessed.csv
+- data/processed/placement_preprocessed.csv
+
+Experimental compatibility outputs:
 
 - data/processed/combined_encoded.csv
 - data/processed/final_preprocessed_dataset.csv
@@ -282,7 +299,7 @@ The implementation uses explicit mappings for binary and ordinal categorical
 fields, one-hot encodes `Peer_Influence`, maps the `Placement` target to 0/1,
 and removes identifier columns that are not model features.
 
-### 5) Data Quality Checks
+### 5) Data Quality and PCA Reports
 
 Concepts:
 
@@ -294,7 +311,16 @@ Command:
 
 ```powershell
 python scripts/dataset_checks.py
+python scripts/data_quality.py
+python scripts/pca_analysis.py
 ```
+
+These commands write `outputs/quality/data_quality.json`,
+`outputs/quality/data_quality.csv`, `outputs/pca/pca_summary.json`,
+`outputs/pca/pca_components.csv`, and
+`outputs/pca/pca_visualization.png`. PCA scaling and fitting use training
+features only, separately for each task track; targets are used only for plot
+coloring.
 
 ### 6) Feature Selection + Train/Val/Test Split
 

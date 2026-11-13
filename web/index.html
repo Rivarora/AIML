@@ -212,7 +212,7 @@
           <button data-view="notes">Notes</button>
         </nav>
       </div>
-      <div class="dataset-note">Processed dataset<strong>6,378 rows</strong>Real repository output · demo input forms</div>
+      <div class="dataset-note">Independent source tracks<strong>Exam + placement</strong>No verified student-level link</div>
     </aside>
 
     <div class="main">
@@ -222,17 +222,19 @@
           <div class="intro"><h1>Student performance analytics</h1><p>Explore the project data and try its baseline prediction models.</p></div>
           <div class="notice"><strong>Important limitation</strong><p>The two source datasets do not belong to verified records of the same students. They were paired by row order for experimentation. Results are not ready for real student decisions.</p></div>
           <div class="grid kpis">
-            <div class="card"><span class="kpi-label">Processed records</span><div class="kpi-value" id="rows">—</div><span class="kpi-note">Combined working dataset</span></div>
+            <div class="card"><span class="kpi-label">Exam records</span><div class="kpi-value" id="rows">—</div><span class="kpi-note">Exam-score source track</span></div>
             <div class="card"><span class="kpi-label">Average exam score</span><div class="kpi-value" id="exam-mean">—</div><span class="kpi-note">Out of 100</span></div>
             <div class="card"><span class="kpi-label">Unplaced records</span><div class="kpi-value" id="unplaced">—</div><span class="kpi-note">Placement class 0</span></div>
             <div class="card"><span class="kpi-label">Placed records</span><div class="kpi-value" id="placed">—</div><span class="kpi-note">Placement class 1</span></div>
           </div>
           <div class="grid two" style="margin-top:14px">
-            <article class="card track track-blue"><span class="label">Regression</span><h2>Exam score prediction</h2><p>Uses the saved Linear Regression model to estimate a score from student factors.</p><div class="metric-row"><div class="metric"><small>MAE</small><strong>0.9194</strong></div><div class="metric"><small>RMSE</small><strong>2.1981</strong></div><div class="metric"><small>R²</small><strong>0.6974</strong></div></div><button class="button primary" data-go="exam">Try prediction</button></article>
-            <article class="card track track-green"><span class="label">Classification</span><h2>Placement prediction</h2><p>Uses the saved Random Forest model. Its near-perfect score needs further validation.</p><div class="metric-row"><div class="metric"><small>Accuracy</small><strong>99.79%</strong></div><div class="metric"><small>F1</small><strong>99.35%</strong></div><div class="metric"><small>ROC-AUC</small><strong>1.000</strong></div></div><button class="button primary" data-go="placement">Try prediction</button></article>
+            <article class="card track track-blue"><span class="label">Exam source track · regression</span><h2>Exam score prediction</h2><p>Uses the saved Linear Regression model to estimate a score from exam-source factors.</p><div class="metric-row" id="exam-metrics"></div><button class="button primary" data-go="exam">Try prediction</button></article>
+            <article class="card track track-green"><span class="label">Placement source track · classification</span><h2>Placement prediction</h2><p>Uses independent placement-source fields. It is not a prediction for the exam records.</p><div class="metric-row" id="placement-metrics"></div><button class="button primary" data-go="placement">Try prediction</button></article>
           </div>
           <div class="section-heading"><h2>Selected features</h2><span class="subtle">From training-only feature selection</span></div>
-          <div class="card features"><div class="feature"><b>Attendance</b><div class="bar"><i style="width:100%"></i></div><span>Exam score</span></div><div class="feature"><b>Hours studied</b><div class="bar"><i style="width:82%"></i></div><span>Exam score</span></div><div class="feature"><b>Previous scores</b><div class="bar"><i style="width:56%"></i></div><span>Exam score</span></div><div class="feature"><b>CGPA</b><div class="bar green"><i style="width:100%"></i></div><span>Placement</span></div><div class="feature"><b>Communication skills</b><div class="bar green"><i style="width:58%"></i></div><span>Placement</span></div></div>
+          <div class="card features"><div class="feature"><b>Attendance</b><div class="bar"><i style="width:100%"></i></div><span>Exam source</span></div><div class="feature"><b>Hours studied</b><div class="bar"><i style="width:82%"></i></div><span>Exam source</span></div><div class="feature"><b>Previous scores</b><div class="bar"><i style="width:56%"></i></div><span>Exam source</span></div><div class="feature"><b>CGPA</b><div class="bar green"><i style="width:100%"></i></div><span>Placement source</span></div><div class="feature"><b>Communication skills</b><div class="bar green"><i style="width:58%"></i></div><span>Placement source</span></div></div>
+          <div class="section-heading"><h2>Two-component PCA</h2><span class="subtle">Fit on training features only</span></div>
+          <div class="card"><img src="/api/pca/visualization" alt="PCA visualization for independent test splits" style="max-width:100%"><p class="subtle">Separate PCA views for the exam and placement tracks; colors show each track's target.</p></div>
         </section>
 
         <section id="exam" class="view hidden">
@@ -257,14 +259,14 @@
             <div class="field"><label>Previous semester result</label><input name="prev_sem_result" type="number" min="0" max="10" step=".1" value="8.2" required></div>
             <div class="field"><label>IQ</label><input name="iq" type="number" min="70" max="160" value="115" required></div>
             <div class="field"><label>Projects completed</label><input name="projects_completed" type="number" min="0" max="10" value="4" required></div>
-            <div class="field"><label>Academic performance (0–5)</label><input name="academic_performance" type="number" min="0" max="5" value="3" required></div>
-            <div class="field"><label>Peer negative</label><select name="peer_negative"><option value="0" selected>No</option><option value="1">Yes</option></select></div>
-            <div class="field"><label>Peer positive</label><select name="peer_positive"><option value="1" selected>Yes</option><option value="0">No</option></select></div>
+            <div class="field"><label>Academic performance (0–10)</label><input name="academic_performance" type="number" min="0" max="10" value="8" required></div>
+            <div class="field"><label>Extra-curricular score</label><input name="extra_curricular_score" type="number" min="0" max="10" value="7" required></div>
+            <div class="field"><label>Internship experience</label><select name="internship_experience"><option value="0" selected>No</option><option value="1">Yes</option></select></div>
           </div><div class="actions"><button class="button primary" type="submit">Predict placement</button><button class="button" type="reset">Reset</button></div></form><div class="card result" id="placement-result"><span class="label">Prediction</span><div class="result-score">— <span>probability</span></div><div class="result-box"><h3>Waiting for input</h3><p>Submit the form to call the real saved model.</p></div></div></div>
         </section>
 
         <section id="models" class="view hidden"><div class="page-heading"><div><h1>Model results</h1><p class="subtle">Metrics generated by the repository's test-set analysis.</p></div><button class="button" onclick="loadMetrics()">Refresh</button></div><div class="card"><table><thead><tr><th>Task</th><th>Model</th><th>Primary metrics</th></tr></thead><tbody id="metrics-body"></tbody></table></div><div class="notice"><strong>Interpretation</strong><p>Random Forest placement performance is unusually high. Treat it as an experiment requiring repeated validation, not as proof of real-world accuracy.</p></div></section>
-        <section id="quality" class="view hidden"><div class="page-heading"><div><h1>Data quality</h1><p class="subtle">Checks from the current processed dataset.</p></div></div><div class="grid two"><div class="card"><h2>Processed data</h2><div class="quality-list"><div><span>Rows</span><b id="q-rows">—</b></div><div><span>Columns</span><b id="q-cols">—</b></div><div><span>Missing values</span><b class="success" id="q-nulls">—</b></div><div><span>Duplicate rows</span><b class="success" id="q-dupes">—</b></div><div><span>Exam score range</span><b id="q-range">—</b></div></div></div><div class="card"><h2>Known limitation</h2><p class="notes">The source datasets do not share a reliable student identifier. The preprocessing script pairs rows by order for experimentation. This can create relationships that do not exist in real student data.</p></div></div></section>
+        <section id="quality" class="view hidden"><div class="page-heading"><div><h1>Data quality</h1><p class="subtle">Generated checks for the independent source tracks.</p></div></div><div class="grid two"><div class="card"><h2>Exam source track</h2><div class="quality-list"><div><span>Rows</span><b id="q-rows">—</b></div><div><span>Columns</span><b id="q-cols">—</b></div><div><span>Missing values</span><b id="q-nulls">—</b></div><div><span>Duplicate rows</span><b id="q-dupes">—</b></div><div><span>Exam score range</span><b id="q-range">—</b></div></div></div><div class="card"><h2>Linkage status</h2><p class="notes"><b class="error">Not genuinely linked.</b> The source files do not share a student identifier. Any row-order pairing is retained only as an experimental artifact and excluded from the main modeling workflow.</p></div></div></section>
         <section id="notes" class="view hidden"><div class="page-heading"><div><h1>Project notes</h1><p class="subtle">What this project is, and what it is not.</p></div></div><div class="card notes"><h2>What it does</h2><p>It estimates exam scores and placement outcomes from student-related fields using two baseline machine-learning models.</p><h2>What is complete</h2><p>Data preparation, exploratory analysis, train/validation/test splits, baseline training, metrics, and structural checks are implemented.</p><h2>What is left</h2><p>Use genuinely linked student records, add repeated cross-validation, explainability, fairness checks, authentication, saved prediction history, and a production deployment process.</p></div></section>
       </main>
     </div>
@@ -288,18 +290,23 @@
     }
     async function loadSummary() {
       const data = await api("/api/summary");
-      $("#rows").textContent = data.rows.toLocaleString();
+      $("#rows").textContent = data.exam_rows.toLocaleString();
       $("#exam-mean").textContent = data.exam_mean;
       $("#unplaced").textContent = data.placement_unplaced.toLocaleString();
       $("#placed").textContent = data.placement_placed.toLocaleString();
-      $("#q-rows").textContent = data.rows.toLocaleString();
-      $("#q-cols").textContent = data.columns;
-      $("#q-nulls").textContent = data.nulls;
-      $("#q-dupes").textContent = data.duplicates;
+      $("#q-rows").textContent = data.exam_rows.toLocaleString();
+      $("#q-cols").textContent = data.exam_columns;
+      $("#q-nulls").textContent = data.exam_nulls;
+      $("#q-dupes").textContent = data.exam_duplicates;
       $("#q-range").textContent = `${data.exam_min}–${data.exam_max}`;
     }
     async function loadMetrics() {
       const rows = await api("/api/metrics");
+      const metric = (label, value) => `<div class="metric"><small>${label}</small><strong>${value}</strong></div>`;
+      const exam = rows.find((row) => row.task === "exam_score_regression");
+      const placement = rows.find((row) => row.task === "placement_classification");
+      if (exam) $("#exam-metrics").innerHTML = metric("MAE", exam.MAE.toFixed(4)) + metric("RMSE", exam.RMSE.toFixed(4)) + metric("R²", exam.R2.toFixed(4));
+      if (placement) $("#placement-metrics").innerHTML = metric("Accuracy", `${(placement.Accuracy * 100).toFixed(2)}%`) + metric("F1", `${(placement.F1 * 100).toFixed(2)}%`) + metric("ROC-AUC", placement.ROC_AUC.toFixed(4));
       $("#metrics-body").innerHTML = rows.map((row) => {
         const values = row.task.includes("regression")
           ? `MAE ${row.MAE.toFixed(4)} · RMSE ${row.RMSE.toFixed(4)} · R² ${row.R2.toFixed(4)}`

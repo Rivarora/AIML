@@ -18,10 +18,9 @@ from sklearn.feature_selection import SelectKBest, f_regression, f_classif
 from sklearn.model_selection import train_test_split
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-INPUT_FILE = PROJECT_ROOT / "data" / "processed" / "final_preprocessed_dataset.csv"
+EXAM_INPUT_FILE = PROJECT_ROOT / "data" / "processed" / "exam_score_preprocessed.csv"
+PLACEMENT_INPUT_FILE = PROJECT_ROOT / "data" / "processed" / "placement_preprocessed.csv"
 SPLITS_DIR = PROJECT_ROOT / "data" / "splits"
-
-df = pd.read_csv(INPUT_FILE)
 
 PERFORMANCE_FEATURES = [
     "Hours_Studied", "Attendance", "Parental_Involvement", "Access_to_Resources",
@@ -33,7 +32,6 @@ PERFORMANCE_FEATURES = [
 PLACEMENT_FEATURES = [
     "IQ", "Prev_Sem_Result", "CGPA", "Academic_Performance", "Internship_Experience",
     "Extra_Curricular_Score", "Communication_Skills", "Projects_Completed",
-    "Peer_Negative", "Peer_Neutral", "Peer_Positive",
 ]
 
 
@@ -67,16 +65,19 @@ def select_and_split(X, y, task, k=8):
 
 
 def main() -> None:
+    exam_df = pd.read_csv(EXAM_INPUT_FILE)
+    placement_df = pd.read_csv(PLACEMENT_INPUT_FILE)
+
     # ---- Track A: Exam_Score (regression) ----
-    X_perf = df[PERFORMANCE_FEATURES]
-    y_perf = df["Exam_Score"]
+    X_perf = exam_df[PERFORMANCE_FEATURES]
+    y_perf = exam_df["Exam_Score"]
     Xa_train, Xa_val, Xa_test, ya_train, ya_val, ya_test, _ = select_and_split(
         X_perf, y_perf, task="regression", k=8
     )
 
     # ---- Track B: Placement (classification) ----
-    X_place = df[PLACEMENT_FEATURES]
-    y_place = df["Placement"]
+    X_place = placement_df[PLACEMENT_FEATURES]
+    y_place = placement_df["Placement"]
     Xb_train, Xb_val, Xb_test, yb_train, yb_val, yb_test, _ = select_and_split(
         X_place, y_place, task="classification", k=8
     )
