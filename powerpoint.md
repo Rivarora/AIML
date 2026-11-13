@@ -1,7 +1,9 @@
 # Student Performance Analytics
 ## PowerPoint Content Draft
 
-> Copy the slide titles and bullet points into PowerPoint. Replace the bracketed placeholders with university, team, and member details. Use the suggested visual on each slide where possible.
+> Copy the slide titles and bullet points into PowerPoint. Project-specific
+> names, mentor, date, and source URLs were not included in this repository;
+> add them before submission.
 
 ---
 
@@ -18,9 +20,9 @@ Chitkara University, Punjab, India
 Department of Computer Science & Engineering
 
 **Team Details**
-- Team members: [Add names and roll numbers]
-- Faculty mentor: [Add name]
-- Evaluation: [Add evaluation name/date]
+- Team members: Not provided in repository
+- Faculty mentor: Not provided in repository
+- Evaluation: Evaluation-1 (date not provided)
 
 **Speaker point:** This is a two-track machine learning project: one regression problem for Exam_Score and one classification problem for Placement.
 
@@ -100,7 +102,7 @@ The completed baseline demonstrates a reproducible pipeline from raw datasets to
 
 ### Dataset 1: StudentPerformanceFactors.csv
 
-- **Source:** Public Kaggle educational dataset; add the exact dataset URL used by the team in the final slide.
+- **Source:** Public Kaggle educational dataset; original URL not provided in repository.
 - Original size: 6,607 records, 20 columns.
 - Target: **Exam_Score**.
 - Task type: regression.
@@ -118,7 +120,7 @@ The completed baseline demonstrates a reproducible pipeline from raw datasets to
 
 ### Dataset 2: college_student_placement_dataset.csv
 
-- **Source:** Public Kaggle student placement dataset; add the exact dataset URL used by the team in the final slide.
+- **Source:** Public Kaggle student placement dataset; original URL not provided in repository.
 - Original size: 10,000 records, 10 columns.
 - Target: **Placement**.
 - Task type: binary classification.
@@ -145,9 +147,9 @@ The completed baseline demonstrates a reproducible pipeline from raw datasets to
 
 ```text
 Data sources: Public Kaggle datasets
-1. StudentPerformanceFactors.csv - [insert exact Kaggle URL]
-2. college_student_placement_dataset.csv - [insert exact Kaggle URL]
-Accessed: [insert access date]
+1. StudentPerformanceFactors.csv - URL not recorded in repository
+2. college_student_placement_dataset.csv - URL not recorded in repository
+Accessed: date not recorded in repository
 ```
 
 ---
@@ -174,7 +176,8 @@ Accessed: [insert access date]
 
 - All model inputs were converted into a consistent numeric format.
 - The final processed dataset contains 0 reported null values and 0 duplicate rows in the current quality check.
-- The cleaned performance dataset retains the available student records instead of deleting rows unnecessarily.
+- The cleaning script removes duplicate rows and incomplete performance rows;
+  6,378 of 6,607 performance rows remain.
 
 **Suggested visual:** Before/after table showing issue, treatment, and result.
 
@@ -182,40 +185,24 @@ Accessed: [insert access date]
 
 ## Slide 7: Missing-Value Treatment
 
-### Method: Mean imputation for ordinal variables
+### Method: remove incomplete performance rows
 
-The affected categorical/ordinal values were first mapped to numeric levels:
+The current implementation does not impute missing values. It removes duplicate
+rows and then removes rows with missing values before combining the datasets.
+This leaves 6,378 complete performance records and produces a processed file
+with zero missing values.
 
-- Low = 0
-- Medium = 1
-- High = 2
-
-For each affected column:
-
-1. Convert known ordinal categories to numeric values.
-2. Calculate the mean of the available values.
-3. Round the mean to the nearest valid category level.
-4. Fill missing cells with that category level.
-5. Verify the result using `isnull().sum().sum()`.
-
-### Example: Teacher_Quality
-
-- Known-value sum: 7,819.
-- Known-value count: 6,529.
-- Mean: approximately 1.198.
-- Rounded replacement: 1, representing Medium.
-
-### Why this method was used
-
-- Preserved records instead of dropping rows.
-- Maintained the ordinal order of categories.
-- Produced a complete numeric dataset for later encoding and modeling.
+The invalid `Exam_Score` value of 101 is clipped to 100 before the processed
+dataset is written.
 
 ### Limitation
 
-Mean imputation can reduce natural variation and may not represent every individual student accurately. Future work can compare it with mode imputation, model-based imputation, or a preprocessing pipeline that learns imputation values only from training data.
+Dropping incomplete rows can reduce the available sample and may bias the
+dataset if missingness is systematic. A future version can use a training-only
+imputation pipeline, but that is not part of the current baseline.
 
-**Suggested visual:** A small flow diagram: ordinal category -> numeric mapping -> mean -> rounded category -> completed data.
+**Suggested visual:** A small flow diagram: raw rows -> remove duplicates and
+incomplete rows -> clip score to 0-100 -> encode categories.
 
 ---
 
@@ -268,8 +255,8 @@ The current repository contains prepared encoded datasets, but the full preproce
 - Duplicate rows: 0.
 - Exam_Score mean: 67.252.
 - Exam_Score standard deviation: 3.913.
-- Placement class 0: 5,319 records.
-- Placement class 1: 1,059 records.
+- Placement class 0: 5,338 records.
+- Placement class 1: 1,040 records.
 
 ### Initial observations
 
@@ -385,8 +372,8 @@ python scripts/analyze_baselines.py
 
 | Model | MAE | RMSE | R2 |
 |---|---:|---:|---:|
-| Linear Regression | 0.9225 | 2.3378 | 0.6585 |
-| Random Forest Regressor | 1.1977 | 2.5892 | 0.5812 |
+| Linear Regression | 0.9194 | 2.1981 | 0.6974 |
+| Random Forest Regressor | 1.1996 | 2.4082 | 0.6367 |
 
 **Interpretation:** Linear Regression is the stronger baseline on the current test split. Its mean residual is close to zero, but individual prediction errors still require inspection.
 
@@ -394,8 +381,8 @@ python scripts/analyze_baselines.py
 
 | Model | Accuracy | Precision | Recall | F1 | ROC-AUC |
 |---|---:|---:|---:|---:|---:|
-| Logistic Regression | 0.8924 | 0.7258 | 0.5660 | 0.6360 | 0.9408 |
-| Random Forest Classifier | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 |
+| Logistic Regression | 0.9112 | 0.7669 | 0.6538 | 0.7059 | 0.9520 |
+| Random Forest Classifier | 0.9979 | 1.0000 | 0.9872 | 0.9935 | 1.0000 |
 
 **Interpretation:** The perfect Random Forest result is suspicious and should not be presented as proven real-world performance. Logistic Regression is a more conservative baseline.
 
@@ -449,12 +436,13 @@ A responsible student analytics tool that helps educators identify performance a
 
 ### Data Sources and References
 
-- StudentPerformanceFactors.csv, public Kaggle dataset: [insert exact URL]
-- college_student_placement_dataset.csv, public Kaggle dataset: [insert exact URL]
+- StudentPerformanceFactors.csv, public Kaggle dataset: URL not recorded in repository
+- college_student_placement_dataset.csv, public Kaggle dataset: URL not recorded in repository
 - pandas documentation: https://pandas.pydata.org/docs/
 - scikit-learn documentation: https://scikit-learn.org/stable/
 
-Replace the two dataset placeholders with the exact Kaggle URLs used by the team before presenting. The repository currently stores the CSV files but does not record their original URLs.
+The repository currently stores the CSV files but does not record their
+original URLs. Add the source URLs if the team has them before presenting.
 
 ---
 
@@ -492,6 +480,6 @@ python scripts/analyze_baselines.py
 
 - Use one consistent color for the Exam_Score regression track and another for the Placement classification track.
 - Prefer charts from `outputs/eda/` and `outputs/analysis/` instead of adding decorative graphics.
-- Do not describe the Random Forest placement score of 1.0000 as a confirmed real-world success.
+- Do not describe the Random Forest placement score of 0.9979 accuracy as a confirmed real-world success.
 - Say “the current working dataset uses row-wise synthetic pairing” rather than implying that both datasets belong to the same students.
 - Keep slide text concise; use the speaker points and tables for explanation during the presentation.

@@ -35,6 +35,27 @@ python scripts/train_baselines.py
 python scripts/analyze_baselines.py
 ```
 
+### 6) Run the interactive dashboard
+
+The Stitch-inspired frontend is served by Flask and calls the trained models
+through JSON API endpoints:
+
+```powershell
+python app.py
+```
+
+Open `http://127.0.0.1:5000` in a browser. The dashboard includes:
+
+- Overview metrics and feature summaries
+- Live exam-score prediction using the saved Linear Regression model
+- Live placement prediction using the saved Random Forest model
+- Current model metrics and data-quality checks
+- Project limitations and research notes
+
+The API also exposes `/api/health`, `/api/summary`, `/api/metrics`,
+`/api/predict/exam`, and `/api/predict/placement`. Placement predictions remain
+experimental because the source datasets were paired synthetically.
+
 ### 4) Where outputs are generated
 
 - EDA text/statistics/plots: outputs/eda/
@@ -72,13 +93,6 @@ python train_baselines.py
 - Added project documentation, progress status, and handoff notes
 - Generated outputs (EDA plots, metrics CSV/JSON, saved baseline models)
 
-### Teammate 3 (expected next)
-
-- Validate model quality and check leakage risk
-- Add confusion matrix and error analysis notes
-- Convert outputs into final Evaluation-1 report/slides
-- Document limitations and Phase-2 plan
-
 ### Teammate 3 (completed in this stage)
 
 - Moved feature selection after splitting so `SelectKBest` is fitted on training data only
@@ -100,8 +114,9 @@ Evaluation-1 (target 40%) includes:
 
 Current status relative to 40%:
 
-- Completed: 1 to 5 (baseline level)
-- Remaining to close 40% cleanly: item 6 + deeper interpretation by Teammate 3
+- Completed: items 1 to 6 at baseline level.
+- The presentation still needs the team's names, mentor, date, and original
+  dataset URLs before submission.
 
 ## What Is Left After 40% (Final Phase)
 
@@ -141,6 +156,9 @@ AIML/
 |   |-- run_eda.py
 |   |-- train_baselines.py
 |   |-- analyze_baselines.py
+|-- app.py
+|-- web/
+|   |-- index.html
 |-- outputs/
 |   |-- eda/
 |   |   |-- eda_summary.txt
@@ -170,7 +188,6 @@ AIML/
 |-- docs/
 |   |-- Data_Preprocessing_Documentation.docx
 |   |-- summary_first_evaluation.md
-|-- Data_Preprocessing_Documentation.docx (temporary root duplicate if lock prevented move)
 ```
 
 ### File Purpose Summary
@@ -227,7 +244,8 @@ Concepts:
 Implementation: `python scripts/preprocess.py`
 
 The script removes duplicate rows and drops incomplete student records. It
-writes `data/interim/StudentPerformanceFactors_clean.csv`.
+writes `data/interim/StudentPerformanceFactors_clean.csv`. The one invalid
+`Exam_Score` value of 101 is clipped to the valid upper bound of 100.
 
 ### 3) Data Integration / Pair Construction
 
@@ -241,9 +259,11 @@ Output artifact:
 - data/interim/combined_synthetic_dataset.csv
 
 The current source files do not share a student identifier, so the script
-pairs the cleaned student rows with placement rows by row order and records a
-`synthetic_pair_id`. This is a synthetic dataset construction, not a real
-student-level join.
+pairs the cleaned student rows with the first matching number of placement
+rows by row order and records a `synthetic_pair_id`. This is a synthetic
+dataset construction, not a real student-level join. The rows are not shuffled,
+so this pairing must not be interpreted as a relationship between the same
+students.
 
 ### 4) Encoding and Final Preprocessing
 
@@ -378,10 +398,10 @@ python scripts/analyze_baselines.py
 
 From outputs/metrics/baseline_metrics.csv:
 
-- Exam_Score (LinearRegression): MAE 0.9225, RMSE 2.3378, R2 0.6585
-- Exam_Score (RandomForestRegressor): MAE 1.1984, RMSE 2.5877, R2 0.5816
-- Placement (LogisticRegression): Accuracy 0.8924, F1 0.6360, ROC-AUC 0.9408
-- Placement (RandomForestClassifier): Accuracy 1.0000, F1 1.0000, ROC-AUC 1.0000
+- Exam_Score (LinearRegression): MAE 0.9194, RMSE 2.1981, R2 0.6974
+- Exam_Score (RandomForestRegressor): MAE 1.1996, RMSE 2.4082, R2 0.6367
+- Placement (LogisticRegression): Accuracy 0.9112, F1 0.7059, ROC-AUC 0.9520
+- Placement (RandomForestClassifier): Accuracy 0.9979, F1 0.9935, ROC-AUC 1.0000
 
 Note: Perfect classification metrics should be investigated for possible leakage before final conclusions.
 
@@ -389,14 +409,14 @@ Note: Perfect classification metrics should be investigated for possible leakage
 
 ### Placement Classification
 
-- LogisticRegression remains the more conservative baseline: accuracy 0.8924, positive-class precision 0.7258, recall 0.5660, and F1 0.6360.
-- RandomForestClassifier still produces perfect test metrics after training-only feature selection: accuracy, precision, recall, F1, and ROC-AUC are all 1.0000.
+- LogisticRegression remains the more conservative baseline: accuracy 0.9112, positive-class precision 0.7669, recall 0.6538, and F1 0.7059.
+- RandomForestClassifier still produces near-perfect test metrics after training-only feature selection: accuracy 0.9979, precision 1.0000, recall 0.9872, F1 0.9935, and ROC-AUC 1.0000.
 - Therefore, the perfect result was not caused only by selecting features on the full dataset. It remains a risk signal requiring stronger validation, such as repeated cross-validation, permutation testing, and review of the source data construction.
-- Because the positive class is only 1,059 of 6,378 rows, accuracy alone is not sufficient; positive-class recall and F1 should be emphasized.
+- Because the positive class is only 1,040 of 6,378 rows, accuracy alone is not sufficient; positive-class recall and F1 should be emphasized.
 
 ### Exam Score Regression
 
-- LinearRegression remains the stronger baseline: MAE 0.9225, RMSE 2.3378, and R2 0.6585.
+- LinearRegression remains the stronger baseline: MAE 0.9194, RMSE 2.1980, and R2 0.6974.
 - RandomForestRegressor remains weaker: MAE 1.1977, RMSE 2.5892, and R2 0.5812.
 - Mean residuals are close to zero for both models, so there is no large overall directional bias in the test predictions.
 

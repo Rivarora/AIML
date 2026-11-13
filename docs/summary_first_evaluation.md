@@ -45,19 +45,19 @@ This project analyzes student performance and placement outcomes using a two-tra
 
 ### Regression (Exam_Score)
 
-- LinearRegression: MAE 0.9225, RMSE 2.3378, R2 0.6585
-- RandomForestRegressor: MAE 1.1977, RMSE 2.5892, R2 0.5812
+- LinearRegression: MAE 0.9194, RMSE 2.1981, R2 0.6974
+- RandomForestRegressor: MAE 1.1996, RMSE 2.4082, R2 0.6367
 
 ### Classification (Placement)
 
-- LogisticRegression: Accuracy 0.8924, Precision 0.7258, Recall 0.5660, F1 0.6360, ROC-AUC 0.9408
-- RandomForestClassifier: Accuracy 1.0000, Precision 1.0000, Recall 1.0000, F1 1.0000, ROC-AUC 1.0000
+- LogisticRegression: Accuracy 0.9112, Precision 0.7669, Recall 0.6538, F1 0.7059, ROC-AUC 0.9520
+- RandomForestClassifier: Accuracy 0.9979, Precision 1.0000, Recall 0.9872, F1 0.9935, ROC-AUC 1.0000
 
 ## Interpretation Note
 
-The perfect placement performance from RandomForestClassifier remains suspicious. It survived the training-only feature-selection correction, so it was not caused only by selecting features on the full dataset. It may indicate very easy separability, source-data leakage, or an artifact of the synthetic construction. It should not be presented as proof of real-world performance.
+The near-perfect placement performance from RandomForestClassifier remains suspicious. It survived the training-only feature-selection correction, so it was not caused only by selecting features on the full dataset. It may indicate very easy separability, source-data leakage, or an artifact of the synthetic construction. It should not be presented as proof of real-world performance.
 
-The placement dataset is imbalanced: 5,319 records belong to class 0 and 1,059 records belong to class 1. Therefore, positive-class precision, recall, F1, and the confusion matrix are more informative than accuracy alone.
+The placement dataset is imbalanced: 5,338 records belong to class 0 and 1,040 records belong to class 1. Therefore, positive-class precision, recall, F1, and the confusion matrix are more informative than accuracy alone.
 
 LinearRegression is the stronger exam-score baseline. Its mean residual is close to zero, but this only indicates limited overall directional bias; it does not mean that every individual prediction is accurate.
 
@@ -74,7 +74,7 @@ LinearRegression is the stronger exam-score baseline. Its mean residual is close
 ### Interpretation
 
 - LogisticRegression provides a more conservative placement baseline: positive-class recall is 0.5660 and F1 is 0.6360.
-- RandomForestClassifier obtains perfect test metrics, but this result requires stronger validation before being treated as reliable.
+- RandomForestClassifier obtains near-perfect test metrics, but this result requires stronger validation before being treated as reliable.
 - The synthetic pairing strategy is the primary limitation of the current project because the performance and placement attributes were not collected as linked records from the same students.
 
 ## Reproduction Commands

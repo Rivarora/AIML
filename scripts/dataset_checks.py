@@ -17,19 +17,27 @@ DATA_FILE = PROJECT_ROOT / "data" / "processed" / "combined_encoded.csv"
 
 
 def main() -> None:
-	combined_df = pd.read_csv(DATA_FILE)
+    combined_df = pd.read_csv(DATA_FILE)
 
-	# Total number of missing values across all columns.
-	print(combined_df.isnull().sum().sum())
+    # Total number of missing values across all columns.
+    null_count = int(combined_df.isnull().sum().sum())
+    print(null_count)
 
-	# Number of duplicate rows in the full dataset.
-	print(combined_df.duplicated().sum())
+    # Number of duplicate rows in the full dataset.
+    duplicate_count = int(combined_df.duplicated().sum())
+    print(duplicate_count)
 
-	# Count of column datatypes (for quick schema sanity-check).
-	print(combined_df.dtypes.apply(lambda x: x.name).value_counts())
+    # Count of column datatypes (for quick schema sanity-check).
+    print(combined_df.dtypes.apply(lambda x: x.name).value_counts())
+
+    if null_count or duplicate_count:
+        raise ValueError("Processed data contains null values or duplicate rows.")
+    if not combined_df["Exam_Score"].between(0, 100).all():
+        raise ValueError("Exam_Score contains values outside the 0-100 range.")
+    if not set(combined_df["Placement"].unique()).issubset({0, 1}):
+        raise ValueError("Placement contains values other than 0 and 1.")
 
 
 if __name__ == "__main__":
 	main()
-
 

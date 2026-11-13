@@ -2,6 +2,7 @@
 
 Pipeline steps:
 1. Remove duplicate and incomplete rows from the student-performance data.
+2. Cap the single invalid Exam_Score value at the documented maximum of 100.
 2. Pair the cleaned student rows with placement rows by row order.
 3. Convert categorical values to documented numeric codes.
 4. One-hot encode ``Peer_Influence``.
@@ -47,10 +48,11 @@ STUDENT_CATEGORICAL_MAPS = {
 
 
 def clean_student_data() -> pd.DataFrame:
-    """Remove duplicate and incomplete student-performance records."""
+    """Clean student-performance records and enforce the score range."""
     student_df = pd.read_csv(STUDENT_FILE)
     student_df = student_df.drop_duplicates()
     student_df = student_df.dropna().reset_index(drop=True)
+    student_df["Exam_Score"] = student_df["Exam_Score"].clip(upper=100)
     return student_df
 
 
