@@ -19,9 +19,16 @@ from scripts.model_config import (
 ROOT = Path(__file__).resolve().parent
 MODELS_DIR = ROOT / "models"
 METRICS_DIR = ROOT / "outputs" / "metrics"
+EVALUATION_DIR = ROOT / "outputs" / "evaluation"
+EXPLANATION_DIR = ROOT / "outputs" / "explanations"
 METRICS_FILE = METRICS_DIR / "baseline_metrics.csv"
 CV_FILE = METRICS_DIR / "cross_validation.json"
 OVERFITTING_FILE = METRICS_DIR / "overfitting_analysis.json"
+MODEL_PERFORMANCE_FILE = EVALUATION_DIR / "model_performance.json"
+EVALUATION_CV_FILE = EVALUATION_DIR / "cross_validation_results.json"
+EVALUATION_OVERFITTING_FILE = EVALUATION_DIR / "overfitting_report.json"
+LEAKAGE_REPORT_FILE = EVALUATION_DIR / "leakage_report.json"
+EXPLANATION_SUMMARY_FILE = EXPLANATION_DIR / "explanation_summary.json"
 MODEL_CARD_FILE = METRICS_DIR / "model_card.json"
 EXAM_FILE = ROOT / "data" / "processed" / "exam_score_preprocessed.csv"
 PLACEMENT_FILE = ROOT / "data" / "processed" / "placement_preprocessed.csv"
@@ -160,8 +167,12 @@ def health():
             "models_loaded": True,
             "artifacts": {
                 "metrics": METRICS_FILE.exists(),
-                "cross_validation": CV_FILE.exists(),
-                "overfitting": OVERFITTING_FILE.exists(),
+                "model_performance": MODEL_PERFORMANCE_FILE.exists(),
+                "cross_validation": EVALUATION_CV_FILE.exists() or CV_FILE.exists(),
+                "overfitting": EVALUATION_OVERFITTING_FILE.exists()
+                or OVERFITTING_FILE.exists(),
+                "feature_importance": EXPLANATION_SUMMARY_FILE.exists(),
+                "leakage_report": LEAKAGE_REPORT_FILE.exists(),
                 "placement_investigation": PLACEMENT_INVESTIGATION_FILE.exists(),
                 "data_quality": QUALITY_FILE.exists(),
                 "pca_summary": PCA_FILE.exists(),
@@ -235,19 +246,55 @@ def metrics():
     return jsonify(METRICS)
 
 
+@app.get("/api/model-performance")
+def model_performance():
+    report = _read_json(MODEL_PERFORMANCE_FILE)
+    if report is None:
+        return jsonify({"error": "Run python scripts/train_models.py first."}), 503
+    return jsonify(report)
+
+
 @app.get("/api/cross-validation")
 def cross_validation():
-    report = _read_json(CV_FILE)
-    if report is None:
-        return jsonify({"error": "Run python scripts/train_baselines.py first."}), 503
-    return jsonify(report)
+    report = _read_json(EVALUATION_CV_FILE)
+    if report is not None:
+        return jsonify(report)
+    legacy = _read_json(CV_FILE)
+    if legacy is None:
+        return jsonify(
+            {"error": "Run python scripts/cross_validation.py first."}
+        ), 503
+    return jsonify({"legacy_format": True, "results": legacy})
 
 
 @app.get("/api/overfitting")
 def overfitting():
-    report = _read_json(OVERFITTING_FILE)
+    report = _read_json(EVALUATION_OVERFITTING_FILE)
+    if report is not None:
+        return jsonify(report)
+    legacy = _read_json(OVERFITTING_FILE)
+    if legacy is None:
+        return jsonify(
+            {"error": "Run python scripts/overfitting_analysis.py first."}
+        ), 503
+    return jsonify({"legacy_format": True, **legacy})
+
+
+@app.get("/api/feature-importance")
+def feature_importance():
+    report = _read_json(EXPLANATION_SUMMARY_FILE)
     if report is None:
-        return jsonify({"error": "Run python scripts/train_baselines.py first."}), 503
+        return jsonify({"error": "Run python scripts/explain_models.py first."}), 503
+    return jsonify(report)
+
+
+@app.get("/api/leakage")
+def leakage():
+    report = _read_json(LEAKAGE_REPORT_FILE)
+    if report is None:
+        return jsonify(
+            {"error": "Run python scripts/leakage_investigation.py first."}
+        ), 503
     return jsonify(report)
 
 
