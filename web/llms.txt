@@ -1,0 +1,47 @@
+# Student Performance Analytics
+
+> Decision-support workspace for academic performance and placement readiness.
+> The exam-score and placement datasets are independent and share no student
+> identifier. Models are experimental; no production accuracy is claimed.
+
+## Product
+
+- `/` — single-page workspace with six views: Overview, Academic Performance,
+  Placement Readiness, Student Insights, Recommendations, Model Insights.
+- `/api/health` — artifact and model readiness.
+- `/api/prediction-schema` — field names, labels, ranges, and allowed values
+  shared by the API, training scripts, and web forms.
+
+## Prediction endpoints
+
+- `POST /api/predict/exam` — JSON body with the exam-track fields from
+  `/api/prediction-schema`. Returns a bounded score, an approximate ±1 RMSE
+  band, limitations, and advisory prompts.
+- `POST /api/predict/placement` — JSON body with the placement-track fields.
+  Returns the model output at a 0.5 threshold. The placement label is
+  deterministic in the synthetic source, so high scores are a dataset artifact.
+- `POST /api/interventions` — optional subset of numeric fields; returns
+  transparent advisory prompts, never a prediction.
+
+## Evidence endpoints
+
+- `/api/summary`, `/api/metrics`, `/api/model-performance`
+- `/api/cross-validation`, `/api/overfitting`
+- `/api/feature-importance`, `/api/leakage`, `/api/placement-investigation`
+- `/api/data-quality`, `/api/pca`, `/api/clusters`, `/api/fairness`
+
+## Reproduction
+
+```bash
+pip install -r requirements.txt
+python scripts/run_pipeline.py
+python app.py
+```
+
+## Limitations
+
+- Both source datasets are synthetic.
+- The placement label is derivable from four features; near-perfect scores
+  describe dataset construction.
+- Clusters and group error comparisons are descriptive, not causal or fair-use
+  certifications.

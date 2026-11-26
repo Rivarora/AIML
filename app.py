@@ -1,125 +1,218 @@
-"""Flask API and web server for the Student Performance Analytics dashboard."""
+"""Flask API and web server for the Student Performance Analytics product.
 
-from pathlib import Path
+The API reads only generated artifacts and saved pipelines. It never retrains a
+model during a request. Prediction inputs are validated against the shared
+field definitions in ``scripts/model_config.py``; model and artifact failures
+return an explicit 503 instead of a misleading prediction.
+"""
+from __future__ import annotations
+
 import json
+import math
+import os
+import threading
+from pathlib import Path
+from typing import Any
 
 import joblib
 import pandas as pd
 from flask import Flask, jsonify, render_template, request, send_file
 
-from scripts.interventions import build_interventions
+from scripts.interventions import advisory_rules, build_interventions
 from scripts.model_config import (
-    EXAM_CATEGORICAL_FEATURES,
     EXAM_MODEL_FEATURES,
     MODEL_LABELS,
-    PLACEMENT_CATEGORICAL_FEATURES,
     PLACEMENT_MODEL_FEATURES,
+    PREDICTION_FIELDS,
+    TASK_META,
+    fields_for,
 )
 
 
 ROOT = Path(__file__).resolve().parent
+WEB_DIR = ROOT / "web"
 MODELS_DIR = ROOT / "models"
-SPLITS_DIR = ROOT / "data" / "splits"
 METRICS_DIR = ROOT / "outputs" / "metrics"
 EVALUATION_DIR = ROOT / "outputs" / "evaluation"
 EXPLANATION_DIR = ROOT / "outputs" / "explanations"
+QUALITY_DIR = ROOT / "outputs" / "quality"
+PCA_DIR = ROOT / "outputs" / "pca"
+CLUSTERING_DIR = ROOT / "outputs" / "clustering"
+FAIRNESS_DIR = ROOT / "outputs" / "fairness"
+ANALYSIS_DIR = ROOT / "outputs" / "analysis"
+
 METRICS_FILE = METRICS_DIR / "baseline_metrics.csv"
 CV_FILE = METRICS_DIR / "cross_validation.json"
 OVERFITTING_FILE = METRICS_DIR / "overfitting_analysis.json"
+MODEL_CARD_FILE = METRICS_DIR / "model_card.json"
 MODEL_PERFORMANCE_FILE = EVALUATION_DIR / "model_performance.json"
 EVALUATION_CV_FILE = EVALUATION_DIR / "cross_validation_results.json"
 EVALUATION_OVERFITTING_FILE = EVALUATION_DIR / "overfitting_report.json"
 LEAKAGE_REPORT_FILE = EVALUATION_DIR / "leakage_report.json"
 EXPLANATION_SUMMARY_FILE = EXPLANATION_DIR / "explanation_summary.json"
-MODEL_CARD_FILE = METRICS_DIR / "model_card.json"
 EXAM_FILE = ROOT / "data" / "processed" / "exam_score_preprocessed.csv"
 PLACEMENT_FILE = ROOT / "data" / "processed" / "placement_preprocessed.csv"
-QUALITY_FILE = ROOT / "outputs" / "quality" / "data_quality.json"
-PCA_FILE = ROOT / "outputs" / "pca" / "pca_summary.json"
-PCA_IMAGE = ROOT / "outputs" / "pca" / "pca_visualization.png"
+QUALITY_FILE = QUALITY_DIR / "data_quality.json"
+PCA_FILE = PCA_DIR / "pca_summary.json"
+PCA_IMAGE = PCA_DIR / "pca_visualization.png"
+CLUSTER_FILE = CLUSTERING_DIR / "cluster_summary.json"
+CLUSTER_IMAGE = CLUSTERING_DIR / "cluster_visualization.png"
+FAIRNESS_FILE = FAIRNESS_DIR / "fairness_summary.json"
 PROVENANCE_FILE = ROOT / "data" / "interim" / "provenance.json"
-PLACEMENT_INVESTIGATION_FILE = (
-    ROOT / "outputs" / "analysis" / "placement_investigation.json"
+PLACEMENT_INVESTIGATION_FILE = ANALYSIS_DIR / "placement_investigation.json"
+
+ADVISORY_NOTE = (
+    "Suggestions are transparent advisory prompts, not model output, causal "
+    "claims, or institutional decisions."
 )
 
-app = Flask(__name__, template_folder="web")
+app = Flask(
+    __name__,
+    template_folder="web",
+    static_folder="web",
+    static_url_path="/assets",
+)
+app.json.sort_keys = False
+
+
+class InputError(ValueError):
+    """A client input failed validation."""
+
+    def __init__(self, message: str, field: str | None = None) -> None:
+        super().__init__(message)
+        self.field = field
+
+
+class ArtifactUnavailable(RuntimeError):
+    """A required generated artifact is missing or unreadable."""
+
+
+_JSON_CACHE: dict[Path, tuple[int, int, Any]] = {}
+_MODEL_CACHE: dict[str, tuple[int, int, Any]] = {}
+_CACHE_LOCK = threading.Lock()
 
 
 def _read_json(path: Path):
+    """Read a generated JSON artifact with a small mtime-aware cache."""
     if not path.exists():
         return None
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
-MODEL_CARD = _read_json(MODEL_CARD_FILE) or {}
-EXAM_FEATURES = EXAM_MODEL_FEATURES
-PLACEMENT_FEATURES = PLACEMENT_MODEL_FEATURES
-
-
-def _feature_order(track: str) -> list[str]:
-    path = SPLITS_DIR / f"{'exam_score' if track == 'exam' else 'placement'}_train.csv"
-    if not path.exists():
-        raise FileNotFoundError(f"Run python scripts/select_and_split.py first; missing {path.name}.")
-    frame = pd.read_csv(path, nrows=0)
-    expected = EXAM_MODEL_FEATURES if track == "exam" else PLACEMENT_MODEL_FEATURES
-    missing = [column for column in expected if column not in frame.columns]
-    if missing:
-        raise ValueError(f"{path.name} is missing trained model features: {', '.join(missing)}.")
-    return [column for column in frame.columns if column in expected]
+    try:
+        stat = path.stat()
+    except OSError:
+        return None
+    with _CACHE_LOCK:
+        cached = _JSON_CACHE.get(path)
+        if cached and cached[0] == stat.st_mtime_ns and cached[1] == stat.st_size:
+            return cached[2]
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    with _CACHE_LOCK:
+        _JSON_CACHE[path] = (stat.st_mtime_ns, stat.st_size, value)
+    return value
 
 
 def _load_model(track: str):
-    filename = (
-        "LinearRegression_exam_score.joblib"
-        if track == "exam"
-        else "RandomForestClassifier_placement.joblib"
-    )
-    path = MODELS_DIR / filename
+    """Load a saved pipeline once per artifact version."""
+    meta = TASK_META[track]
+    path = MODELS_DIR / meta["artifact"]
     if not path.exists():
-        raise FileNotFoundError(f"Run python scripts/train_baselines.py first; missing {filename}.")
-    return joblib.load(path)
+        raise ArtifactUnavailable(
+            f"Missing {meta['artifact']}. Run python scripts/train_models.py first."
+        )
+    try:
+        stat = path.stat()
+    except OSError as exc:
+        raise ArtifactUnavailable(f"Could not read {meta['artifact']}: {exc}") from exc
+    with _CACHE_LOCK:
+        cached = _MODEL_CACHE.get(track)
+        if cached and cached[0] == stat.st_mtime_ns and cached[1] == stat.st_size:
+            return cached[2]
+    try:
+        model = joblib.load(path)
+    except Exception as exc:  # joblib raises several backend-specific errors
+        raise ArtifactUnavailable(
+            f"Could not load {meta['artifact']}: {exc}"
+        ) from exc
+    with _CACHE_LOCK:
+        _MODEL_CACHE[track] = (stat.st_mtime_ns, stat.st_size, model)
+    return model
 
 
 def _prediction_payload() -> dict:
     payload = request.get_json(silent=True)
     if not isinstance(payload, dict):
-        raise ValueError("Request body must be a JSON object.")
+        raise InputError("Request body must be a JSON object.")
     return payload
 
 
-def _schema_field(name: str, label: str, field_type: str, required: bool, **kwargs) -> dict:
-    return {"field": name, "label": label, "type": field_type, "required": required, **kwargs}
+def _number_field(field: dict, payload: dict) -> float:
+    key = field["name"]
+    label = field["label"]
+    value = payload.get(key)
+    if value is None or (isinstance(value, str) and not value.strip()):
+        raise InputError(f"{label} is required.", key)
+    if isinstance(value, bool):
+        raise InputError(f"{label} must be a number.", key)
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as exc:
+        raise InputError(f"{label} must be a number.", key) from exc
+    if not math.isfinite(number):
+        raise InputError(f"{label} must be a finite number.", key)
+    minimum = float(field["min"])
+    maximum = float(field["max"])
+    if not minimum <= number <= maximum:
+        raise InputError(
+            f"{label} must be between {minimum:g} and {maximum:g}.", key
+        )
+    return number
 
 
-def _prediction_schema() -> dict:
-    return {
-        "exam": [
-            _schema_field("hours_studied", "Hours studied per week", "number", True, minimum=0, maximum=168),
-            _schema_field("attendance", "Attendance (%)", "number", True, minimum=0, maximum=100),
-            _schema_field("previous_scores", "Previous scores", "number", True, minimum=0, maximum=100),
-            _schema_field("tutoring_sessions", "Tutoring sessions", "number", True, minimum=0, maximum=100),
-            _schema_field("access_to_resources", "Access to resources", "category", True, allowed=EXAM_CATEGORICAL_FEATURES["Access_to_Resources"]),
-            _schema_field("parental_involvement", "Parental involvement", "category", True, allowed=EXAM_CATEGORICAL_FEATURES["Parental_Involvement"]),
-            _schema_field("parental_education_level", "Parental education", "category", True, allowed=EXAM_CATEGORICAL_FEATURES["Parental_Education_Level"]),
-            _schema_field("family_income", "Family income", "category", True, allowed=EXAM_CATEGORICAL_FEATURES["Family_Income"]),
-        ],
-        "placement": [
-            _schema_field("iq", "IQ", "number", True, minimum=70, maximum=160),
-            _schema_field("prev_sem_result", "Previous semester result", "number", True, minimum=0, maximum=10),
-            _schema_field("cgpa", "CGPA", "number", True, minimum=0, maximum=10),
-            _schema_field("academic_performance", "Academic performance", "number", True, minimum=0, maximum=10),
-            _schema_field("internship_experience", "Internship experience", "category", True, allowed=PLACEMENT_CATEGORICAL_FEATURES["Internship_Experience"]),
-            _schema_field("extra_curricular_score", "Extra-curricular score", "number", True, minimum=0, maximum=10),
-            _schema_field("communication_skills", "Communication skills", "number", True, minimum=0, maximum=10),
-            _schema_field("projects_completed", "Projects completed", "number", True, minimum=0, maximum=10),
-        ],
-    }
+def _category_field(field: dict, payload: dict) -> str:
+    key = field["name"]
+    label = field["label"]
+    allowed = list(field["allowed"])
+    value = payload.get(key)
+    if value is None or (isinstance(value, str) and not value.strip()):
+        raise InputError(f"{label} is required.", key)
+    text = str(value).strip()
+    for candidate in allowed:
+        if text.lower() == candidate.lower():
+            return candidate
+    try:
+        index = int(text)
+    except (TypeError, ValueError) as exc:
+        raise InputError(
+            f"{label} must be one of: {', '.join(allowed)}.", key
+        ) from exc
+    if 0 <= index < len(allowed):
+        return allowed[index]
+    raise InputError(f"{label} must be one of: {', '.join(allowed)}.", key)
+
+
+def _validated_inputs(track: str, payload: dict) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Validate a track payload and return model values plus advisory values."""
+    model_values: dict[str, Any] = {}
+    advisory_values: dict[str, Any] = {}
+    for field in fields_for(track):
+        if field["type"] == "number":
+            number = _number_field(field, payload)
+            model_values[field["column"]] = number
+            advisory_values[field["name"]] = number
+        else:
+            model_values[field["column"]] = _category_field(field, payload)
+    return model_values, advisory_values
 
 
 def _metrics_records() -> list[dict]:
     if not METRICS_FILE.exists():
         return []
-    frame = pd.read_csv(METRICS_FILE)
+    try:
+        frame = pd.read_csv(METRICS_FILE)
+    except (OSError, ValueError):
+        return []
     frame = frame.astype(object).where(lambda values: pd.notna(values), None)
     return frame.to_dict("records")
 
@@ -127,7 +220,7 @@ def _metrics_records() -> list[dict]:
 METRICS = _metrics_records()
 
 
-def _metric(task: str, model: str, key: str):
+def _legacy_metric(task: str, model: str, key: str):
     for row in METRICS:
         if row.get("task") == task and row.get("model") == model:
             value = row.get(key)
@@ -135,16 +228,29 @@ def _metric(task: str, model: str, key: str):
     return None
 
 
-EXAM_RMSE = _metric("exam_score_regression", "LinearRegression", "RMSE")
+def _deployed_test_metric(track: str, metric: str):
+    """Read the deployed model's held-out metric from the current artifacts."""
+    meta = TASK_META[track]
+    report = _read_json(MODEL_PERFORMANCE_FILE)
+    if report:
+        for record in report.get("models", []):
+            if record.get("task") == meta["task"] and record.get("deployed"):
+                value = record.get("metrics", {}).get("test", {}).get(metric)
+                if value is not None:
+                    return float(value)
+    legacy_task = "exam_score_regression" if track == "exam" else "placement_classification"
+    legacy_model = "LinearRegression" if track == "exam" else "RandomForestClassifier"
+    return _legacy_metric(legacy_task, legacy_model, metric)
 
 
 def _model_label(track: str) -> str:
-    deployed = MODEL_CARD.get("deployed", {}).get(track, {})
-    return deployed.get("label") or MODEL_LABELS[track]
+    card = _read_json(MODEL_CARD_FILE) or {}
+    deployed = card.get("deployed", {}).get(track, {})
+    return deployed.get("label") or TASK_META[track]["model_label"] or MODEL_LABELS[track]
 
 
 def _linkage_status() -> dict:
-    """Return the generated linkage facts, never a hand-written claim."""
+    """Return generated linkage facts, never a hand-written claim."""
     quality = _read_json(QUALITY_FILE)
     if quality and quality.get("linkage"):
         link = quality["linkage"]
@@ -176,42 +282,35 @@ def _linkage_status() -> dict:
     }
 
 
-def _number(payload: dict, key: str, minimum: float, maximum: float) -> float:
-    value = payload.get(key)
-    if value is None:
-        raise ValueError(f"{key} is required.")
-    try:
-        number = float(value)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"{key} must be a number.") from exc
-    if not minimum <= number <= maximum:
-        raise ValueError(f"{key} must be between {minimum:g} and {maximum:g}.")
-    return number
+def _artifact_status() -> dict[str, bool]:
+    return {
+        "exam_data": EXAM_FILE.exists(),
+        "placement_data": PLACEMENT_FILE.exists(),
+        "exam_model": (MODELS_DIR / TASK_META["exam"]["artifact"]).exists(),
+        "placement_model": (MODELS_DIR / TASK_META["placement"]["artifact"]).exists(),
+        "metrics": METRICS_FILE.exists(),
+        "model_performance": MODEL_PERFORMANCE_FILE.exists(),
+        "cross_validation": EVALUATION_CV_FILE.exists() or CV_FILE.exists(),
+        "overfitting": EVALUATION_OVERFITTING_FILE.exists() or OVERFITTING_FILE.exists(),
+        "feature_importance": EXPLANATION_SUMMARY_FILE.exists(),
+        "leakage_report": LEAKAGE_REPORT_FILE.exists(),
+        "placement_investigation": PLACEMENT_INVESTIGATION_FILE.exists(),
+        "data_quality": QUALITY_FILE.exists(),
+        "pca_summary": PCA_FILE.exists(),
+        "pca_visualization": PCA_IMAGE.exists(),
+        "clusters": CLUSTER_FILE.exists(),
+        "cluster_visualization": CLUSTER_IMAGE.exists(),
+        "fairness": FAIRNESS_FILE.exists(),
+        "provenance": PROVENANCE_FILE.exists(),
+        "model_card": MODEL_CARD_FILE.exists(),
+    }
 
 
-def _category(payload: dict, key: str, allowed: list[str]) -> str:
-    """Accept the category label, or a legacy 0-based index for convenience."""
-    value = payload.get(key)
-    if value is None:
-        raise ValueError(f"{key} is required.")
-    text = str(value).strip()
-    for candidate in allowed:
-        if text.lower() == candidate.lower():
-            return candidate
-    try:
-        index = int(text)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"{key} must be one of: {', '.join(allowed)}.") from exc
-    if 0 <= index < len(allowed):
-        return allowed[index]
-    raise ValueError(f"{key} must be one of: {', '.join(allowed)}.")
-
-
-def _prediction_frame(values: dict[str, object], features: list[str]) -> pd.DataFrame:
-    missing = [feature for feature in features if feature not in values]
-    if missing:
-        raise ValueError(f"Missing model features: {', '.join(missing)}.")
-    return pd.DataFrame([[values[feature] for feature in features]], columns=features)
+def _generated_json(path: Path, instruction: str):
+    report = _read_json(path)
+    if report is None:
+        return jsonify({"error": instruction}), 503
+    return jsonify(report)
 
 
 @app.get("/")
@@ -219,35 +318,63 @@ def index():
     return render_template("index.html")
 
 
+@app.get("/llms.txt")
+def llms():
+    path = WEB_DIR / "llms.txt"
+    if not path.exists():
+        return jsonify({"error": "llms.txt is not available."}), 404
+    return send_file(path, mimetype="text/plain")
+
+
 @app.get("/api/health")
 def health():
+    artifacts = _artifact_status()
+    core_ready = all(
+        artifacts[key]
+        for key in ("exam_data", "placement_data", "exam_model", "placement_model")
+    )
     return jsonify(
         {
-            "status": "ok",
-            "models_loaded": True,
-            "artifacts": {
-                "metrics": METRICS_FILE.exists(),
-                "model_performance": MODEL_PERFORMANCE_FILE.exists(),
-                "cross_validation": EVALUATION_CV_FILE.exists() or CV_FILE.exists(),
-                "overfitting": EVALUATION_OVERFITTING_FILE.exists()
-                or OVERFITTING_FILE.exists(),
-                "feature_importance": EXPLANATION_SUMMARY_FILE.exists(),
-                "leakage_report": LEAKAGE_REPORT_FILE.exists(),
-                "placement_investigation": PLACEMENT_INVESTIGATION_FILE.exists(),
-                "data_quality": QUALITY_FILE.exists(),
-                "pca_summary": PCA_FILE.exists(),
-                "pca_visualization": PCA_IMAGE.exists(),
-                "provenance": PROVENANCE_FILE.exists(),
+            "status": "ok" if core_ready else "degraded",
+            "core_ready": core_ready,
+            "models": {
+                track: {
+                    "ready": artifacts[f"{track}_model"],
+                    "artifact": TASK_META[track]["artifact"],
+                    "label": _model_label(track),
+                }
+                for track in TASK_META
             },
+            "artifacts": artifacts,
+            "prediction_tracks": list(TASK_META),
         }
     )
 
 
 @app.get("/api/summary")
 def summary():
-    exam = pd.read_csv(EXAM_FILE)
-    placement = pd.read_csv(PLACEMENT_FILE)
-    placement_counts = placement["Placement"].value_counts().to_dict()
+    try:
+        exam = pd.read_csv(EXAM_FILE)
+        placement = pd.read_csv(PLACEMENT_FILE)
+        placement_counts = placement["Placement"].value_counts().to_dict()
+        exam_mean = float(exam["Exam_Score"].mean())
+        exam_std = float(exam["Exam_Score"].std())
+        exam_min = int(exam["Exam_Score"].min())
+        exam_max = int(exam["Exam_Score"].max())
+        placement_rate = float(placement["Placement"].mean())
+    except (OSError, ValueError, KeyError) as exc:
+        return (
+            jsonify(
+                {
+                    "error": (
+                        "Processed datasets are unavailable. Run python "
+                        f"scripts/preprocess.py first. ({exc})"
+                    )
+                }
+            ),
+            503,
+        )
+
     linkage = _linkage_status()
     return jsonify(
         {
@@ -259,59 +386,39 @@ def summary():
             "placement_nulls": int(placement.isna().sum().sum()),
             "exam_duplicates": int(exam.duplicated().sum()),
             "placement_duplicates": int(placement.duplicated().sum()),
-            "exam_mean": round(float(exam["Exam_Score"].mean()), 2),
-            "exam_std": round(float(exam["Exam_Score"].std()), 2),
-            "exam_min": int(exam["Exam_Score"].min()),
-            "exam_max": int(exam["Exam_Score"].max()),
+            "exam_mean": round(exam_mean, 2),
+            "exam_std": round(exam_std, 2),
+            "exam_min": exam_min,
+            "exam_max": exam_max,
             "placement_unplaced": int(placement_counts.get(0, 0)),
             "placement_placed": int(placement_counts.get(1, 0)),
-            "placement_rate": round(float(placement["Placement"].mean()), 4),
-            "exam_features": EXAM_FEATURES,
-            "placement_features": PLACEMENT_FEATURES,
+            "placement_rate": round(placement_rate, 4),
+            "exam_features": EXAM_MODEL_FEATURES,
+            "placement_features": PLACEMENT_MODEL_FEATURES,
             "deployed_models": {
                 "exam": _model_label("exam"),
                 "placement": _model_label("placement"),
             },
+            "exam_model_test_rmse": _deployed_test_metric("exam", "RMSE"),
             **linkage,
             "datasets_are_independent": not linkage["source_records_genuinely_linked"],
         }
     )
 
 
-@app.get("/api/data-quality")
-def data_quality():
-    report = _read_json(QUALITY_FILE)
-    if report is None:
-        return jsonify({"error": "Run python scripts/data_quality.py first."}), 503
-    return jsonify(report)
-
-
-@app.get("/api/pca")
-def pca():
-    report = _read_json(PCA_FILE)
-    if report is None:
-        return jsonify({"error": "Run python scripts/pca_analysis.py first."}), 503
-    return jsonify(report)
-
-
-@app.get("/api/pca/visualization")
-def pca_visualization():
-    if not PCA_IMAGE.exists():
-        return jsonify({"error": "Run python scripts/pca_analysis.py first."}), 503
-    return send_file(PCA_IMAGE, mimetype="image/png")
-
-
 @app.get("/api/metrics")
 def metrics():
+    if not METRICS:
+        return jsonify({"error": "Run python scripts/train_baselines.py first."}), 503
     return jsonify(METRICS)
 
 
 @app.get("/api/model-performance")
 def model_performance():
-    report = _read_json(MODEL_PERFORMANCE_FILE)
-    if report is None:
-        return jsonify({"error": "Run python scripts/train_models.py first."}), 503
-    return jsonify(report)
+    return _generated_json(
+        MODEL_PERFORMANCE_FILE,
+        "Run python scripts/train_models.py first.",
+    )
 
 
 @app.get("/api/cross-validation")
@@ -342,96 +449,124 @@ def overfitting():
 
 @app.get("/api/feature-importance")
 def feature_importance():
-    report = _read_json(EXPLANATION_SUMMARY_FILE)
-    if report is None:
-        return jsonify({"error": "Run python scripts/explain_models.py first."}), 503
-    return jsonify(report)
+    return _generated_json(
+        EXPLANATION_SUMMARY_FILE,
+        "Run python scripts/explain_models.py first.",
+    )
 
 
 @app.get("/api/leakage")
 def leakage():
-    report = _read_json(LEAKAGE_REPORT_FILE)
-    if report is None:
-        return jsonify(
-            {"error": "Run python scripts/leakage_investigation.py first."}
-        ), 503
-    return jsonify(report)
+    return _generated_json(
+        LEAKAGE_REPORT_FILE,
+        "Run python scripts/leakage_investigation.py first.",
+    )
 
 
 @app.get("/api/placement-investigation")
 def placement_investigation():
-    report = _read_json(PLACEMENT_INVESTIGATION_FILE)
-    if report is None:
-        return jsonify({"error": "Run python scripts/train_baselines.py first."}), 503
-    return jsonify(report)
+    return _generated_json(
+        PLACEMENT_INVESTIGATION_FILE,
+        "Run python scripts/train_baselines.py first.",
+    )
 
 
 @app.get("/api/model-card")
 def model_card():
-    if not MODEL_CARD:
-        return jsonify({"error": "Run python scripts/train_baselines.py first."}), 503
-    return jsonify(MODEL_CARD)
-
-
-@app.get("/api/prediction-schema")
-def prediction_schema():
-    try:
-        schema = _prediction_schema()
-        schema["feature_order"] = {
-            "exam": _feature_order("exam"),
-            "placement": _feature_order("placement"),
-        }
-    except (FileNotFoundError, ValueError) as exc:
-        return jsonify({"error": str(exc)}), 503
-    return jsonify(schema)
-
-
-def _generated_json(path: Path, instruction: str):
-    report = _read_json(path)
+    report = _read_json(MODEL_CARD_FILE)
     if report is None:
-        return jsonify({"error": instruction}), 503
+        return jsonify({"error": "Run python scripts/train_baselines.py first."}), 503
     return jsonify(report)
+
+
+@app.get("/api/data-quality")
+def data_quality():
+    return _generated_json(
+        QUALITY_FILE, "Run python scripts/data_quality.py first."
+    )
+
+
+@app.get("/api/pca")
+def pca():
+    return _generated_json(PCA_FILE, "Run python scripts/pca_analysis.py first.")
+
+
+@app.get("/api/pca/visualization")
+def pca_visualization():
+    if not PCA_IMAGE.exists():
+        return jsonify({"error": "Run python scripts/pca_analysis.py first."}), 503
+    return send_file(PCA_IMAGE, mimetype="image/png")
 
 
 @app.get("/api/clusters")
 def clusters():
     return _generated_json(
-        ROOT / "outputs" / "clustering" / "cluster_summary.json",
-        "Run python scripts/clustering.py first.",
+        CLUSTER_FILE, "Run python scripts/clustering.py first."
     )
+
+
+@app.get("/api/clusters/visualization")
+def cluster_visualization():
+    if not CLUSTER_IMAGE.exists():
+        return jsonify({"error": "Run python scripts/clustering.py first."}), 503
+    return send_file(CLUSTER_IMAGE, mimetype="image/png")
 
 
 @app.get("/api/fairness")
 def fairness():
     return _generated_json(
-        ROOT / "outputs" / "fairness" / "fairness_summary.json",
-        "Run python scripts/fairness_analysis.py first.",
+        FAIRNESS_FILE, "Run python scripts/fairness_analysis.py first."
     )
+
+
+@app.get("/api/prediction-schema")
+def prediction_schema():
+    tracks = {}
+    for track, meta in TASK_META.items():
+        fields = fields_for(track)
+        tracks[track] = {
+            **meta,
+            "fields": fields,
+            "feature_order": [field["column"] for field in fields],
+        }
+    return jsonify(
+        {
+            "tracks": tracks,
+            "exam": fields_for("exam"),
+            "placement": fields_for("placement"),
+        }
+    )
+
+
+@app.get("/api/advisory-rules")
+def advisory_rule_list():
+    return jsonify({"rules": advisory_rules(), "advisory_only": True, "note": ADVISORY_NOTE})
 
 
 @app.post("/api/interventions")
 def interventions():
     try:
         payload = _prediction_payload()
-        values = {}
-        optional_ranges = {
-            "attendance": (0, 100),
-            "previous_scores": (0, 100),
-            "communication_skills": (0, 10),
-            "projects_completed": (0, 100),
-            "hours_studied": (0, 168),
-        }
-        for key, (minimum, maximum) in optional_ranges.items():
-            if key in payload:
-                values[key] = _number(payload, key, minimum, maximum)
-        suggestions = build_interventions(values)
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
+        fields: dict[str, dict] = {}
+        for track in PREDICTION_FIELDS:
+            for field in fields_for(track):
+                if field["type"] == "number":
+                    fields.setdefault(field["name"], field)
+        values: dict[str, float] = {}
+        for name, field in fields.items():
+            if name in payload and payload[name] is not None:
+                if isinstance(payload[name], str) and not payload[name].strip():
+                    continue
+                values[name] = _number_field(field, payload)
+    except InputError as exc:
+        return jsonify({"error": str(exc), "field": exc.field}), 400
     return jsonify(
         {
-            "suggestions": suggestions,
+            "suggestions": build_interventions(values),
+            "provided_fields": sorted(values),
             "advisory_only": True,
-            "note": "Suggestions are explainable prompts, not model output or institutional decisions.",
+            "rules": advisory_rules(),
+            "note": ADVISORY_NOTE,
         }
     )
 
@@ -440,52 +575,45 @@ def interventions():
 def predict_exam():
     try:
         payload = _prediction_payload()
-        values = {
-            "Hours_Studied": _number(payload, "hours_studied", 0, 168),
-            "Attendance": _number(payload, "attendance", 0, 100),
-            "Previous_Scores": _number(payload, "previous_scores", 0, 100),
-            "Tutoring_Sessions": _number(payload, "tutoring_sessions", 0, 100),
-            "Access_to_Resources": _category(
-                payload, "access_to_resources", EXAM_CATEGORICAL_FEATURES["Access_to_Resources"]
-            ),
-            "Parental_Involvement": _category(
-                payload, "parental_involvement", EXAM_CATEGORICAL_FEATURES["Parental_Involvement"]
-            ),
-            "Parental_Education_Level": _category(
-                payload,
-                "parental_education_level",
-                EXAM_CATEGORICAL_FEATURES["Parental_Education_Level"],
-            ),
-            "Family_Income": _category(
-                payload, "family_income", EXAM_CATEGORICAL_FEATURES["Family_Income"]
-            ),
-        }
+        values, advisory_values = _validated_inputs("exam", payload)
         model = _load_model("exam")
-        prediction = float(model.predict(_prediction_frame(values, _feature_order("exam")))[0])
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
-    except (FileNotFoundError, OSError, ValueError) as exc:
+        frame = pd.DataFrame(
+            [values], columns=[field["column"] for field in fields_for("exam")]
+        )
+        prediction = float(model.predict(frame)[0])
+    except InputError as exc:
+        return jsonify({"error": str(exc), "field": exc.field}), 400
+    except ArtifactUnavailable as exc:
         return jsonify({"error": f"Prediction unavailable: {exc}"}), 503
 
     score = max(0.0, min(100.0, prediction))
+    rmse = _deployed_test_metric("exam", "RMSE")
     interval = None
     interval_basis = None
-    if EXAM_RMSE is not None:
-        interval = [round(max(0, score - EXAM_RMSE), 2), round(min(100, score + EXAM_RMSE), 2)]
-        interval_basis = f"+/- 1 RMSE ({EXAM_RMSE:.4f})"
+    if rmse is not None:
+        interval = [
+            round(max(0.0, score - rmse), 2),
+            round(min(100.0, score + rmse), 2),
+        ]
+        interval_basis = f"Approximate +/- 1 held-out RMSE ({rmse:.3f})"
+    tier = "Strong" if score >= 75 else "On track" if score >= 50 else "Needs support"
     return jsonify(
         {
+            "track": "exam",
+            "task": "regression",
             "score": round(score, 2),
             "rounded_score": round(score),
             "interval": interval,
             "interval_basis": interval_basis,
-            "tier": "Strong" if score >= 75 else "Average" if score >= 50 else "At risk",
+            "interval_note": (
+                "This is an approximate error band from the held-out test set, "
+                "not a confidence interval or a guarantee."
+            ),
+            "tier": tier,
             "model": _model_label("exam"),
-            "limitations": [
-                "This is an experimental estimate from a baseline model.",
-                "The estimate is not guaranteed and does not describe a linked placement record.",
-            ],
-            "advisory_suggestions": build_interventions(payload),
+            "limitations": TASK_META["exam"]["limitations"],
+            "advisory_suggestions": build_interventions(advisory_values),
+            "advisory_note": ADVISORY_NOTE,
         }
     )
 
@@ -494,35 +622,28 @@ def predict_exam():
 def predict_placement():
     try:
         payload = _prediction_payload()
-        values = {
-            "CGPA": _number(payload, "cgpa", 0, 10),
-            "Communication_Skills": _number(payload, "communication_skills", 0, 10),
-            "Prev_Sem_Result": _number(payload, "prev_sem_result", 0, 10),
-            "IQ": _number(payload, "iq", 70, 160),
-            "Projects_Completed": _number(payload, "projects_completed", 0, 10),
-            "Academic_Performance": _number(payload, "academic_performance", 0, 10),
-            "Extra_Curricular_Score": _number(payload, "extra_curricular_score", 0, 10),
-            "Internship_Experience": _category(
-                payload,
-                "internship_experience",
-                PLACEMENT_CATEGORICAL_FEATURES["Internship_Experience"],
-            ),
-        }
+        values, advisory_values = _validated_inputs("placement", payload)
         model = _load_model("placement")
-        frame = _prediction_frame(values, _feature_order("placement"))
+        frame = pd.DataFrame(
+            [values],
+            columns=[field["column"] for field in fields_for("placement")],
+        )
         prediction = int(model.predict(frame)[0])
         probability = float(model.predict_proba(frame)[0, 1])
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
-    except (FileNotFoundError, OSError, ValueError) as exc:
+    except InputError as exc:
+        return jsonify({"error": str(exc), "field": exc.field}), 400
+    except ArtifactUnavailable as exc:
         return jsonify({"error": f"Prediction unavailable: {exc}"}), 503
 
     linkage = _linkage_status()
     return jsonify(
         {
+            "track": "placement",
+            "task": "classification",
             "placed": bool(prediction),
             "probability": round(probability, 4),
             "percentage": round(probability * 100, 1),
+            "decision_threshold": 0.5,
             "model": _model_label("placement"),
             "source_track": "placement",
             "exam_records_linked": linkage["source_records_genuinely_linked"],
@@ -530,16 +651,51 @@ def predict_placement():
                 "This result comes from the independent placement dataset. "
                 "The placement label is deterministic in this source, so high "
                 "scores reflect dataset construction, not real-world accuracy. "
-                "The data is synthetic/experimental."
+                "The data are synthetic and experimental."
             ),
-            "limitations": [
-                "This probability is not a guarantee of placement.",
-                "The source data is synthetic/experimental and its label is deterministic.",
-            ],
-            "advisory_suggestions": build_interventions(payload),
+            "probability_note": (
+                "This is the model's output at a 0.5 threshold. It is not a "
+                "calibrated probability and not a guarantee of placement."
+            ),
+            "limitations": TASK_META["placement"]["limitations"],
+            "advisory_suggestions": build_interventions(advisory_values),
+            "advisory_note": ADVISORY_NOTE,
         }
     )
 
 
+@app.errorhandler(404)
+def not_found(error):
+    if request.path.startswith("/api/"):
+        return jsonify({"error": "Endpoint not found."}), 404
+    return ("Not found", 404)
+
+
+@app.errorhandler(405)
+def method_not_allowed(error):
+    if request.path.startswith("/api/"):
+        return jsonify({"error": "Method not allowed for this endpoint."}), 405
+    return ("Method not allowed", 405)
+
+
+@app.errorhandler(500)
+def internal_error(error):
+    app.logger.error("Unhandled server error: %s", error)
+    if request.path.startswith("/api/"):
+        return jsonify({"error": "Internal server error."}), 500
+    return ("Internal server error", 500)
+
+
+@app.after_request
+def security_headers(response):
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("Referrer-Policy", "same-origin")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    return response
+
+
 if __name__ == "__main__":
-    app.run(debug=True)
+    host = os.environ.get("HOST", "127.0.0.1")
+    port = int(os.environ.get("PORT", "5000"))
+    debug = os.environ.get("FLASK_DEBUG", "0") == "1"
+    app.run(host=host, port=port, debug=debug)

@@ -3,946 +3,660 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A decision-support workspace for academic performance and placement readiness, built on two independent datasets with explicit limitations.">
+  <meta name="theme-color" content="#0d2820">
   <title>Student Performance Analytics</title>
-  <style>
-    :root {
-      --ink: #232323;
-      --muted: #6b6f73;
-      --line: #e2e1dc;
-      --paper: #ffffff;
-      --page: #f6f5f1;
-      --accent: #2f5d50;
-      --accent-soft: #eef3f0;
-      --warn: #8a5a1f;
-      --warn-soft: #fbf4e6;
-      --bad: #9b2c2c;
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/assets/styles.css">
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Student Performance Analytics",
+      "applicationCategory": "EducationalApplication",
+      "description": "Decision support for academic performance and placement readiness using independent, clearly limited datasets.",
+      "isAccessibleForFree": true
     }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      background: var(--page);
-      color: var(--ink);
-      font: 15px/1.55 "Segoe UI", system-ui, -apple-system, sans-serif;
-    }
-    h1, h2, h3, p { margin: 0; }
-    h1 { font-size: 30px; line-height: 1.2; font-weight: 650; letter-spacing: -0.01em; }
-    h2 { font-size: 19px; font-weight: 650; }
-    h3 { font-size: 15px; font-weight: 650; }
-    button, input, select { font: inherit; }
-    button { cursor: pointer; }
-
-    .shell { display: flex; min-height: 100vh; }
-    .sidebar {
-      width: 216px;
-      flex: 0 0 216px;
-      background: var(--paper);
-      border-right: 1px solid var(--line);
-      padding: 26px 16px;
-    }
-    .brand { margin: 0 8px 26px; }
-    .brand b { display: block; font-size: 14px; line-height: 1.35; }
-    .brand span { display: block; color: var(--muted); font-size: 12px; margin-top: 4px; }
-    .nav { display: grid; gap: 2px; }
-    .nav button {
-      border: 0;
-      border-radius: 5px;
-      background: transparent;
-      color: #45494d;
-      padding: 8px 9px;
-      text-align: left;
-    }
-    .nav button:hover { background: #f1f0ec; }
-    .nav button.active { background: var(--ink); color: #fff; }
-    .side-note {
-      border-top: 1px solid var(--line);
-      color: var(--muted);
-      font-size: 12px;
-      line-height: 1.5;
-      margin: 26px 8px 0;
-      padding-top: 14px;
-    }
-    .side-note b { color: var(--ink); display: block; font-size: 12px; margin-bottom: 4px; }
-
-    main { flex: 1; min-width: 0; }
-    .topbar {
-      align-items: center;
-      background: var(--paper);
-      border-bottom: 1px solid var(--line);
-      display: flex;
-      justify-content: space-between;
-      min-height: 56px;
-      padding: 0 28px;
-    }
-    .topbar span { color: var(--muted); font-size: 13px; }
-    .content { max-width: 1060px; padding: 30px 28px 60px; }
-    .view.hidden { display: none; }
-    .page-head { margin-bottom: 20px; }
-    .page-head p, .muted { color: var(--muted); margin-top: 5px; }
-    .eyebrow {
-      color: var(--muted);
-      display: block;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      margin-bottom: 5px;
-      text-transform: uppercase;
-    }
-
-    .warning {
-      background: var(--warn-soft);
-      border: 1px solid #ead8b5;
-      border-radius: 7px;
-      color: #5b421d;
-      margin: 18px 0;
-      padding: 13px 15px;
-    }
-    .warning b { color: #4b3515; }
-    .warning p { margin-top: 4px; }
-
-    .cards { display: grid; gap: 12px; grid-template-columns: repeat(4, 1fr); }
-    .two-col { display: grid; gap: 14px; grid-template-columns: 1fr 1fr; margin-top: 14px; }
-    .card {
-      background: var(--paper);
-      border: 1px solid var(--line);
-      border-radius: 7px;
-      padding: 18px;
-    }
-    .stat span { color: var(--muted); display: block; font-size: 12px; }
-    .stat b { display: block; font-size: 26px; font-weight: 650; margin: 5px 0 2px; }
-    .stat small { color: var(--muted); display: block; font-size: 12px; }
-    .track { display: flex; flex-direction: column; }
-    .track h2 { margin: 2px 0 6px; }
-    .track p { color: var(--muted); min-height: 44px; }
-    .badge {
-      background: var(--accent-soft);
-      border-radius: 999px;
-      color: var(--accent);
-      display: inline-block;
-      font-size: 11px;
-      font-weight: 700;
-      padding: 2px 8px;
-    }
-    .metrics { display: flex; gap: 8px; margin: 16px 0; }
-    .metric { background: #f8f7f4; border-radius: 5px; flex: 1; padding: 9px; }
-    .metric small { color: var(--muted); display: block; font-size: 11px; }
-    .metric strong { display: block; font-size: 16px; margin-top: 2px; }
-    .btn, .topbar button {
-      border: 1px solid var(--line);
-      border-radius: 5px;
-      background: var(--paper);
-      color: var(--ink);
-      padding: 8px 12px;
-    }
-    .btn:hover, .topbar button:hover { border-color: #b9b7b0; }
-    .btn.primary { background: var(--ink); border-color: var(--ink); color: #fff; }
-    .btn.primary:hover { background: #383838; }
-    .track .btn { align-self: flex-start; margin-top: auto; }
-
-    .block { margin-top: 28px; }
-    .block-head {
-      align-items: baseline;
-      display: flex;
-      gap: 14px;
-      justify-content: space-between;
-      margin-bottom: 10px;
-    }
-    .block-head .muted { font-size: 12px; text-align: right; }
-    #pca-image { display: block; height: auto; max-width: 100%; width: 100%; }
-    #pca-note { font-size: 13px; margin-top: 8px; }
-
-    .pill {
-      background: #f1f0ec;
-      border-radius: 999px;
-      color: #4d4d4d;
-      font-size: 12px;
-      padding: 4px 10px;
-    }
-    .form-layout { align-items: start; }
-    .form-grid { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; margin-top: 16px; }
-    .field label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 5px; }
-    .field input, .field select {
-      background: #fff;
-      border: 1px solid #cfcdc6;
-      border-radius: 5px;
-      color: var(--ink);
-      padding: 8px;
-      width: 100%;
-    }
-    .actions { display: flex; gap: 8px; margin-top: 16px; }
-    .result { min-height: 240px; }
-    .big { color: var(--accent); font-size: 46px; font-weight: 650; line-height: 1.1; margin: 18px 0 12px; }
-    .big span { color: var(--muted); font-size: 15px; font-weight: 400; }
-    .result p { color: var(--muted); }
-    .result p b { color: var(--ink); }
-    .error { color: var(--bad); }
-    .loading { color: var(--muted); }
-    .bar { background: #e8e7e2; border-radius: 4px; height: 8px; margin-top: 4px; overflow: hidden; }
-    .bar span { background: var(--accent); display: block; height: 100%; }
-    .advisory { background: var(--accent-soft); border-radius: 5px; margin-top: 12px; padding: 10px 12px; }
-    .advisory ul { margin: 5px 0 0; padding-left: 18px; }
-
-    table { border-collapse: collapse; width: 100%; }
-    th, td { border-bottom: 1px solid var(--line); padding: 9px 6px; text-align: left; vertical-align: top; }
-    th { color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; }
-    tr:last-child th, tr:last-child td { border-bottom: 0; }
-    .kv th { font-size: 12px; font-weight: 600; text-transform: none; width: 55%; }
-    .kv td { font-variant-numeric: tabular-nums; }
-    .table-card { margin-top: 14px; }
-    .issues { color: var(--muted); font-size: 14px; }
-    .issues ul { margin: 8px 0 0; padding-left: 18px; }
-    .notes p { color: var(--muted); margin-top: 6px; }
-
-    .status-ok { color: var(--accent); font-weight: 600; }
-    .status-review { color: var(--warn); font-weight: 600; }
-    .status-critical { color: var(--bad); font-weight: 600; }
-    .warning-list { color: #5b421d; margin: 0; padding-left: 18px; }
-    .warning-list li { margin: 4px 0; }
-    .matrix-grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
-    .matrix-grid h3 { margin-bottom: 6px; }
-    .matrix { border-collapse: collapse; width: auto; min-width: 220px; }
-    .matrix th, .matrix td {
-      border: 1px solid var(--line);
-      font-size: 12px;
-      padding: 6px 9px;
-      text-align: center;
-      vertical-align: middle;
-    }
-    .matrix th { background: #f8f7f4; }
-    .matrix-note { font-size: 12px; margin-top: 6px; }
-    .importance-group { margin-top: 18px; }
-    .importance-group h3 { margin-bottom: 6px; }
-    .importance-model { margin-top: 10px; }
-    .importance-model p { color: var(--muted); font-size: 12px; margin-bottom: 5px; }
-    .importance-row {
-      align-items: center;
-      display: grid;
-      font-size: 12px;
-      gap: 10px;
-      grid-template-columns: 170px 1fr 72px;
-      margin: 4px 0;
-    }
-    .importance-row > span:first-child { color: var(--muted); overflow-wrap: anywhere; }
-    .importance-bar { background: #f1f0ec; border-radius: 2px; height: 8px; overflow: hidden; }
-    .importance-bar > i { background: var(--accent); display: block; height: 100%; }
-    .importance-value { font-variant-numeric: tabular-nums; text-align: right; }
-    .metric-tight { font-size: 13px; }
-    .metric-tight b { font-weight: 600; }
-    .notes h2 { margin-top: 20px; }
-    .notes h2:first-child { margin-top: 0; }
-    code {
-      background: #f1f0ec;
-      border-radius: 3px;
-      font-family: Consolas, "Courier New", monospace;
-      font-size: 12px;
-      padding: 1px 4px;
-    }
-
-    @media (max-width: 900px) {
-      .cards { grid-template-columns: 1fr 1fr; }
-      .two-col { grid-template-columns: 1fr; }
-    }
-    @media (max-width: 640px) {
-      .shell { display: block; }
-      .sidebar { border-bottom: 1px solid var(--line); border-right: 0; padding: 16px; width: auto; }
-      .brand { margin-bottom: 14px; }
-      .nav { grid-template-columns: 1fr 1fr; }
-      .side-note { display: none; }
-      .topbar { padding: 0 16px; }
-      .content { padding: 22px 16px 48px; }
-      .cards, .form-grid { grid-template-columns: 1fr; }
-      .block-head { display: block; }
-      .block-head .muted { display: block; text-align: left; margin-top: 3px; }
-    }
-  </style>
+  </script>
 </head>
 <body>
-  <div class="shell">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+    <symbol id="icon-grid" viewBox="0 0 16 16">
+      <path d="M6 1H1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1M5 14H2V2h3zm10-13h-5a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1m-1 13h-3V2h3z"/>
+    </symbol>
+    <symbol id="icon-chart" viewBox="0 0 16 16">
+      <path fill-rule="evenodd" d="M0 0h1v15h15v1H0zm14.817 3.113a.5.5 0 0 1 .07.704l-4.5 5.5a.5.5 0 0 1-.74.037L7.06 6.767l-3.656 5.027a.5.5 0 0 1-.808-.588l4-5.5a.5.5 0 0 1 .758-.06l2.609 2.61 4.15-5.073a.5.5 0 0 1 .704-.07"/>
+    </symbol>
+    <symbol id="icon-briefcase" viewBox="0 0 16 16">
+      <path d="M6.5 1A1.5 1.5 0 0 0 5 2.5V3H1.5A1.5 1.5 0 0 0 0 4.5v8A1.5 1.5 0 0 0 1.5 14h13a1.5 1.5 0 0 0 1.5-1.5v-8A1.5 1.5 0 0 0 14.5 3H11v-.5A1.5 1.5 0 0 0 9.5 1zm0 1h3a.5.5 0 0 1 .5.5V3H6v-.5a.5.5 0 0 1 .5-.5m1.5 6a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-1 0v-1a.5.5 0 0 1 .5-.5"/>
+    </symbol>
+    <symbol id="icon-people" viewBox="0 0 16 16">
+      <path d="M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6m-5.784 6A2.24 2.24 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.3 6.3 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1zM4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5"/>
+    </symbol>
+    <symbol id="icon-lightbulb" viewBox="0 0 16 16">
+      <path d="M2 6a6 6 0 1 1 10.174 4.31c-.203.196-.359.4-.453.619l-.762 1.769A.5.5 0 0 1 10.5 13a.5.5 0 0 1 0 1 .5.5 0 0 1 0 1l-.224.447a1 1 0 0 1-.894.553H6.618a1 1 0 0 1-.894-.553L5.5 15a.5.5 0 0 1 0-1 .5.5 0 0 1 0-1 .5.5 0 0 1-.46-.302l-.761-1.77a2 2 0 0 0-.453-.618A5.98 5.98 0 0 1 2 6m6-5a5 5 0 0 0-3.479 8.592c.263.254.514.564.676.941L5.83 12h4.342l.632-1.467c.162-.377.413-.687.676-.941A5 5 0 0 0 8 1"/>
+    </symbol>
+    <symbol id="icon-activity" viewBox="0 0 16 16">
+      <path d="M6 2a.5.5 0 0 1 .47.33L10 12.036l1.53-4.224A.5.5 0 0 1 12 7.5h3.5a.5.5 0 0 1 0 1h-3.19l-1.92 5.296a.5.5 0 0 1-.94.002L5.5 3.694 3.5 9.5H.5a.5.5 0 0 1 0-1h2.5z"/>
+    </symbol>
+    <symbol id="icon-check" viewBox="0 0 16 16">
+      <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+      <path d="m10.97 4.97a.235.235 0 0 0-.02.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-1.071-1.05"/>
+    </symbol>
+    <symbol id="icon-warning" viewBox="0 0 16 16">
+      <path d="M7.938 2.016A.13.13 0 0 1 8.002 2a.13.13 0 0 1 .063.016.15.15 0 0 1 .054.057l6.857 11.667c.036.06.035.124.002.183a.2.2 0 0 1-.054.06.1.1 0 0 1-.066.017H1.146a.1.1 0 0 1-.066-.017.2.2 0 0 1-.054-.06.18.18 0 0 1 .002-.183L7.884 2.073a.15.15 0 0 1 .054-.057m1.044-.45a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767z"/>
+      <path d="M7.002 12a1 1 0 1 1 2 0 1 1 0 0 1-2 0M7.1 5.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0z"/>
+    </symbol>
+    <symbol id="icon-info" viewBox="0 0 16 16">
+      <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+      <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0"/>
+    </symbol>
+    <symbol id="icon-arrow-right" viewBox="0 0 16 16">
+      <path fill-rule="evenodd" d="M1 8a.5.5 0 0 1 .5-.5h11.793l-3.147-3.146a.5.5 0 0 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L13.293 8.5H1.5A.5.5 0 0 1 1 8"/>
+    </symbol>
+    <symbol id="icon-refresh" viewBox="0 0 16 16">
+      <path d="M11.534 7h3.932a.25.25 0 0 1 .192.41l-1.966 2.36a.25.25 0 0 1-.384 0l-1.966-2.36a.25.25 0 0 1 .192-.41m-11 2h3.932a.25.25 0 0 0 .192-.41L2.692 6.23a.25.25 0 0 0-.384 0L.342 8.59A.25.25 0 0 0 .534 9"/>
+      <path fill-rule="evenodd" d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 13.917 7H12.9A5 5 0 0 0 8 3M3.1 9a5 5 0 0 0 8.757 2.182.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9z"/>
+    </symbol>
+  </svg>
+
+  <div class="app-shell">
     <aside class="sidebar">
-      <div class="brand">
-        <b>Student Performance Analytics</b>
-        <span>Course project</span>
-      </div>
-      <nav class="nav">
-        <button data-view="overview" class="active">Overview</button>
-        <button data-view="exam">Exam score</button>
-        <button data-view="placement">Placement</button>
-        <button data-view="clusters">Student clusters</button>
-        <button data-view="fairness">Fairness</button>
-        <button data-view="advisory">Advisory support</button>
-        <button data-view="quality">Data quality</button>
-        <button data-view="models">Model performance</button>
-        <button data-view="notes">Notes</button>
+      <a class="brand" href="#overview" data-nav="overview" aria-label="Student Performance Analytics home">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 16 16"><use href="#icon-chart"></use></svg>
+        </span>
+        <span class="brand-text">
+          <strong>Student Performance Analytics</strong>
+          <span>Decision support, not a verdict</span>
+        </span>
+      </a>
+
+      <nav class="nav" aria-label="Primary navigation">
+        <button class="nav-item is-active" type="button" data-view="overview" aria-current="page">
+          <svg class="icon" aria-hidden="true"><use href="#icon-grid"></use></svg>
+          <span>Overview</span>
+        </button>
+        <button class="nav-item" type="button" data-view="exam">
+          <svg class="icon" aria-hidden="true"><use href="#icon-chart"></use></svg>
+          <span>Academic Performance</span>
+        </button>
+        <button class="nav-item" type="button" data-view="placement">
+          <svg class="icon" aria-hidden="true"><use href="#icon-briefcase"></use></svg>
+          <span>Placement Readiness</span>
+        </button>
+        <button class="nav-item" type="button" data-view="insights">
+          <svg class="icon" aria-hidden="true"><use href="#icon-people"></use></svg>
+          <span>Student Insights</span>
+        </button>
+        <button class="nav-item" type="button" data-view="recommendations">
+          <svg class="icon" aria-hidden="true"><use href="#icon-lightbulb"></use></svg>
+          <span>Recommendations</span>
+        </button>
+        <button class="nav-item" type="button" data-view="models">
+          <svg class="icon" aria-hidden="true"><use href="#icon-activity"></use></svg>
+          <span>Model Insights</span>
+        </button>
       </nav>
-      <div class="side-note">
-        <b>Two separate datasets</b>
-        The exam and placement files do not share a student ID. Their results are kept apart.
+
+      <div class="sidebar-note">
+        <strong>Two independent datasets</strong>
+        The exam and placement files share no student identifier. Results are never joined into a single student record.
+        <span class="sidebar-status">
+          <span class="status-dot" id="sidebar-status-dot" aria-hidden="true"></span>
+          <span id="sidebar-status-text">Checking data connection</span>
+        </span>
       </div>
     </aside>
 
-    <main>
-      <div class="topbar">
-        <span id="page-name">Overview</span>
-        <button id="print" type="button">Print page</button>
-      </div>
+    <div class="workspace">
+      <header class="topbar">
+        <div class="topbar-title">
+          <span class="eyebrow" id="page-eyebrow">Workspace</span>
+          <h1 id="page-title">Overview</h1>
+        </div>
+        <div class="topbar-actions">
+          <span class="status-pill" id="health-pill" role="status" aria-live="polite">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span>Checking data</span>
+          </span>
+          <button class="button quiet" id="print-button" type="button">
+            <svg class="icon icon-sm" aria-hidden="true"><use href="#icon-activity"></use></svg>
+            Print
+          </button>
+        </div>
+      </header>
 
-      <div class="content">
-        <section id="overview" class="view">
-          <div class="page-head">
-            <h1>Student performance data</h1>
-            <p>Two datasets, two models, reported separately. Every number on this page is read from the generated project files.</p>
-          </div>
+      <main class="content" id="main-content" tabindex="-1">
+        <div id="global-alert" class="callout callout-warning" role="alert" hidden></div>
 
-          <div class="warning">
-            <b>These are not linked student records.</b>
-            <p id="link-warning">The exam file has no identifier column. The placement file has <code>College_ID</code>, which does not exist in the exam file. No shared student or college key exists, so the tracks are modelled separately. The earlier row-order pairing has been removed.</p>
-          </div>
-
-          <div class="cards">
-            <div class="card stat"><span>Exam records</span><b id="stat-exam-rows">—</b><small id="stat-exam-cols"></small></div>
-            <div class="card stat"><span>Average exam score</span><b id="stat-exam-mean">—</b><small id="stat-exam-range"></small></div>
-            <div class="card stat"><span>Placement records</span><b id="stat-placement-rows">—</b><small id="stat-placement-cols"></small></div>
-            <div class="card stat"><span>Placed share</span><b id="stat-placement-rate">—</b><small id="stat-placement-counts"></small></div>
-          </div>
-
-          <div class="two-col">
-            <article class="card track">
-              <span class="eyebrow">Exam dataset</span>
-              <h2>Exam score</h2>
-              <p>Regression on attendance, study hours, previous scores, and other exam-file fields.</p>
-              <div class="metrics" id="exam-metrics"></div>
-              <button class="btn primary" data-go="exam" type="button">Open exam page</button>
-            </article>
-            <article class="card track">
-              <span class="eyebrow">Placement dataset</span>
-              <h2>Placement</h2>
-              <p>Classification on CGPA, communication skills, IQ, and other placement-file fields. The label is deterministic in this source, so a depth-limited Random Forest is used instead of advertising a perfect score.</p>
-              <div class="metrics" id="placement-metrics"></div>
-              <button class="btn primary" data-go="placement" type="button">Open placement page</button>
-            </article>
-          </div>
-
-          <section class="block">
-            <div class="block-head">
-              <h2>PCA</h2>
-              <span class="muted">Scaler and PCA fitted on the training split only</span>
+        <section class="view" id="view-overview" data-view-panel="overview" aria-labelledby="overview-title">
+          <div class="hero">
+            <div>
+              <p class="eyebrow">Decision support workspace</p>
+              <h2 id="overview-title">See where support can make the biggest difference.</h2>
+              <p>Explore academic risk and placement readiness without pretending the two datasets describe the same student. Every number is read from generated project artifacts.</p>
+              <div class="hero-actions">
+                <button class="button primary" type="button" data-go="exam">
+                  Explore academic performance
+                  <svg class="icon icon-sm" aria-hidden="true"><use href="#icon-arrow-right"></use></svg>
+                </button>
+                <button class="button" type="button" data-go="placement">Check placement readiness</button>
+              </div>
             </div>
-            <div class="card">
-              <img id="pca-image" src="/api/pca/visualization" alt="PCA scatter plots for the exam and placement test splits">
-              <p id="pca-note">Loading PCA summary…</p>
+            <div class="hero-panel" aria-label="Workspace snapshot">
+              <span class="eyebrow">Workspace snapshot</span>
+              <div class="hero-metric"><span>Exam records</span><strong id="hero-exam-rows">—</strong></div>
+              <div class="hero-metric"><span>Placement records</span><strong id="hero-placement-rows">—</strong></div>
+              <div class="hero-metric"><span>Models evaluated</span><strong id="hero-model-count">—</strong></div>
+            </div>
+          </div>
+
+          <div class="callout callout-warning" id="overview-alert" role="note">
+            <svg class="icon" aria-hidden="true"><use href="#icon-warning"></use></svg>
+            <div>
+              <strong>These are not linked student records.</strong>
+              <p id="overview-alert-text">The two source files share no genuine student identifier. Exam and placement results are reported separately and must never be combined into one student story.</p>
+            </div>
+          </div>
+
+          <div class="stats-grid" id="overview-stats" aria-live="polite">
+            <div class="stat-card"><div class="skeleton skeleton-card"></div></div>
+            <div class="stat-card"><div class="skeleton skeleton-card"></div></div>
+            <div class="stat-card"><div class="skeleton skeleton-card"></div></div>
+            <div class="stat-card"><div class="skeleton skeleton-card"></div></div>
+          </div>
+
+          <div class="grid-2">
+            <article class="card track-card">
+              <div class="card-head">
+                <span class="icon-tile" aria-hidden="true"><svg class="icon"><use href="#icon-chart"></use></svg></span>
+                <span class="badge badge-neutral">Independent track</span>
+              </div>
+              <h3>Academic performance</h3>
+              <p>Estimate an exam score from study habits, attendance, prior attainment, and reported support factors.</p>
+              <div class="metric-row" id="overview-exam-metrics">
+                <div class="metric-chip"><small>Deployed model</small><strong>Loading…</strong></div>
+              </div>
+              <button class="button-link" type="button" data-go="exam">
+                Open academic performance
+                <svg class="icon icon-sm" aria-hidden="true"><use href="#icon-arrow-right"></use></svg>
+              </button>
+            </article>
+
+            <article class="card track-card">
+              <div class="card-head">
+                <span class="icon-tile" aria-hidden="true"><svg class="icon"><use href="#icon-briefcase"></use></svg></span>
+                <span class="badge badge-review">Experimental source</span>
+              </div>
+              <h3>Placement readiness</h3>
+              <p>Estimate a placement outcome from academic, communication, and experience signals in the independent placement dataset.</p>
+              <div class="metric-row" id="overview-placement-metrics">
+                <div class="metric-chip"><small>Deployed model</small><strong>Loading…</strong></div>
+              </div>
+              <button class="button-link" type="button" data-go="placement">
+                Check placement readiness
+                <svg class="icon icon-sm" aria-hidden="true"><use href="#icon-arrow-right"></use></svg>
+              </button>
+            </article>
+          </div>
+
+          <div class="grid-2">
+            <section class="card">
+              <h3>What the data supports</h3>
+              <div id="overview-facts">
+                <div class="skeleton skeleton-line w-80"></div>
+                <div class="skeleton skeleton-line w-60"></div>
+                <div class="skeleton skeleton-line w-40"></div>
+              </div>
+            </section>
+            <section class="card">
+              <h3>How to read this workspace</h3>
+              <ol class="steps" id="overview-steps">
+                <li>Start with the track that matches your question. The two tracks are independent.</li>
+                <li>Read every estimate with its stated limitations. A model output is not a decision.</li>
+                <li>Use Student Insights for descriptive cohort context, not individual labels.</li>
+                <li>Use Model Insights to inspect validation, leakage, and explainability evidence.</li>
+              </ol>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="view-exam" data-view-panel="exam" aria-labelledby="exam-title" hidden>
+          <div class="page-intro">
+            <span class="eyebrow">Academic performance</span>
+            <h2 id="exam-title">Estimate an exam score from the exam dataset.</h2>
+            <p>This form uses only the exam track. The estimate is a baseline model output, not a grade, diagnosis, or promise. Example values are loaded for demonstration.</p>
+            <div class="intro-meta">
+              <span class="badge badge-accent" id="exam-model-badge">Loading model…</span>
+              <span class="badge badge-neutral">Independent track</span>
+              <span class="badge badge-neutral">Regression</span>
+            </div>
+          </div>
+
+          <div class="split-layout">
+            <form class="card form-card" id="exam-form" novalidate>
+              <div class="card-head">
+                <div>
+                  <span class="eyebrow">Student inputs</span>
+                  <h3>Exam-track factors</h3>
+                </div>
+                <span class="badge badge-neutral" id="exam-model-name">Loading…</span>
+              </div>
+              <p class="form-intro">Fields are generated from the same schema the API validates. Required fields are marked with <span class="required">*</span>.</p>
+              <div class="form-grid" id="exam-fields" aria-busy="true">
+                <p class="muted">Loading input fields…</p>
+              </div>
+              <div class="form-actions">
+                <button class="button primary" type="submit" id="exam-submit">Estimate exam score</button>
+                <button class="button" type="reset">Reset example values</button>
+              </div>
+              <p class="form-note">The API validates types, finite numbers, ranges, and category values. Missing model artifacts return a clear service error instead of a fabricated result.</p>
+            </form>
+
+            <aside class="card result-card" id="exam-result" role="region" aria-live="polite" aria-labelledby="exam-result-title">
+              <div class="result-empty">
+                <svg class="icon" aria-hidden="true"><use href="#icon-chart"></use></svg>
+                <h3 id="exam-result-title">Waiting for inputs</h3>
+                <p>Submit the form to call the saved Linear Regression pipeline.</p>
+              </div>
+            </aside>
+          </div>
+
+          <div class="grid-2">
+            <section class="card">
+              <h3>What this estimate can and cannot tell you</h3>
+              <ul class="muted-list" id="exam-limitations">
+                <li>Loading model limitations…</li>
+              </ul>
+            </section>
+            <section class="card">
+              <h3>How the estimate is produced</h3>
+              <div id="exam-process" class="muted small">
+                Loading process details…
+              </div>
+            </section>
+          </div>
+
+          <section class="card">
+            <div class="card-head">
+              <div>
+                <h3>What moves the exam model most</h3>
+                <p class="muted small">Global permutation importance on the held-out test split. Association with prediction is not a causal effect.</p>
+              </div>
+              <span class="badge badge-info">Test split</span>
+            </div>
+            <div id="exam-drivers" class="bar-list" aria-live="polite">
+              <div class="skeleton skeleton-line w-80"></div>
+              <div class="skeleton skeleton-line w-60"></div>
             </div>
           </section>
         </section>
 
-        <section id="exam" class="view hidden">
-          <div class="page-head">
-            <h1>Exam score</h1>
-            <p>This form uses the exam dataset only. The default values are examples, not a real student record.</p>
+        <section class="view" id="view-placement" data-view-panel="placement" aria-labelledby="placement-title" hidden>
+          <div class="page-intro">
+            <span class="eyebrow">Placement readiness</span>
+            <h2 id="placement-title">Explore a placement estimate with its source limits attached.</h2>
+            <p>This form uses only the placement track. The source label is deterministic and synthetic, so high performance describes the dataset construction, not real-world predictive skill.</p>
+            <div class="intro-meta">
+              <span class="badge badge-accent" id="placement-model-badge">Loading model…</span>
+              <span class="badge badge-review">Experimental / synthetic source</span>
+              <span class="badge badge-neutral">Binary classification</span>
+            </div>
           </div>
-          <div class="two-col form-layout">
-            <form class="card" id="exam-form">
-              <span class="eyebrow">Model</span>
-              <h2 id="exam-model-name">Linear Regression</h2>
-              <p class="muted">Demo inputs only — not a real student record.</p>
-              <div class="form-grid">
-                <div class="field"><label for="exam-hours">Hours studied per week</label><input id="exam-hours" name="hours_studied" type="number" min="0" max="50" value="24" required></div>
-                <div class="field"><label for="exam-attendance">Attendance (%)</label><input id="exam-attendance" name="attendance" type="number" min="0" max="100" value="88" required></div>
-                <div class="field"><label for="exam-previous">Previous scores</label><input id="exam-previous" name="previous_scores" type="number" min="0" max="100" value="74" required></div>
-                <div class="field"><label for="exam-tutoring">Tutoring sessions</label><input id="exam-tutoring" name="tutoring_sessions" type="number" min="0" max="100" value="3" required></div>
-                <div class="field"><label for="exam-resources">Access to resources</label><select id="exam-resources" name="access_to_resources"><option value="Low">Low</option><option value="Medium" selected>Medium</option><option value="High">High</option></select></div>
-                <div class="field"><label for="exam-involvement">Parental involvement</label><select id="exam-involvement" name="parental_involvement"><option value="Low">Low</option><option value="Medium" selected>Medium</option><option value="High">High</option></select></div>
-                <div class="field"><label for="exam-education">Parental education</label><select id="exam-education" name="parental_education_level"><option value="High School">High School</option><option value="College" selected>College</option><option value="Postgraduate">Postgraduate</option></select></div>
-                <div class="field"><label for="exam-income">Family income</label><select id="exam-income" name="family_income"><option value="Low">Low</option><option value="Medium" selected>Medium</option><option value="High">High</option></select></div>
+
+          <div class="callout callout-warning">
+            <svg class="icon" aria-hidden="true"><use href="#icon-warning"></use></svg>
+            <div>
+              <strong>This is not a hiring decision or a guarantee.</strong>
+              <p>The placement target can be reproduced from four thresholds in the source data. The deployed forest is deliberately capacity-limited; its probability is a model output, not a calibrated real-world probability.</p>
+            </div>
+          </div>
+
+          <div class="split-layout">
+            <form class="card form-card" id="placement-form" novalidate>
+              <div class="card-head">
+                <div>
+                  <span class="eyebrow">Student inputs</span>
+                  <h3>Placement-track factors</h3>
+                </div>
+                <span class="badge badge-neutral" id="placement-model-name">Loading…</span>
               </div>
-              <div class="actions">
-                <button class="btn primary" type="submit">Predict score</button>
-                <button class="btn" type="reset">Reset</button>
+              <p class="form-intro">Fields are generated from the same schema the API validates. Required fields are marked with <span class="required">*</span>.</p>
+              <div class="form-grid" id="placement-fields" aria-busy="true">
+                <p class="muted">Loading input fields…</p>
+              </div>
+              <div class="form-actions">
+                <button class="button primary" type="submit" id="placement-submit">Estimate placement outcome</button>
+                <button class="button" type="reset">Reset example values</button>
+              </div>
+              <p class="form-note">No exam record is linked to this form. The placement dataset has its own records and its own model.</p>
+            </form>
+
+            <aside class="card result-card" id="placement-result" role="region" aria-live="polite" aria-labelledby="placement-result-title">
+              <div class="result-empty">
+                <svg class="icon" aria-hidden="true"><use href="#icon-briefcase"></use></svg>
+                <h3 id="placement-result-title">Waiting for inputs</h3>
+                <p>Submit the form to call the saved placement pipeline.</p>
+              </div>
+            </aside>
+          </div>
+
+          <div class="grid-2">
+            <section class="card">
+              <h3>What this estimate can and cannot tell you</h3>
+              <ul class="muted-list" id="placement-limitations">
+                <li>Loading model limitations…</li>
+              </ul>
+            </section>
+            <section class="card">
+              <h3>How the estimate is produced</h3>
+              <div id="placement-process" class="muted small">
+                Loading process details…
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="view-insights" data-view-panel="insights" aria-labelledby="insights-title" hidden>
+          <div class="page-intro">
+            <span class="eyebrow">Student insights</span>
+            <h2 id="insights-title">Descriptive cohort context, never permanent student labels.</h2>
+            <p>Clusters, group error comparisons, PCA, and data health are descriptive. They are not predictions about an individual and do not establish causal effects or discrimination.</p>
+          </div>
+
+          <div class="grid-2">
+            <section class="card" id="cluster-summary" aria-live="polite">
+              <div class="skeleton skeleton-line w-40"></div>
+              <div class="skeleton skeleton-line w-80"></div>
+              <div class="skeleton skeleton-line w-60"></div>
+            </section>
+            <figure class="card chart-figure">
+              <img id="cluster-figure" src="/api/clusters/visualization" alt="PCA scatter plot of exam-track cohort clusters" loading="lazy" hidden>
+              <figcaption id="cluster-note" class="muted small">Loading cluster visualization…</figcaption>
+            </figure>
+          </div>
+
+          <section class="card">
+            <div class="card-head">
+              <div>
+                <h2>Cluster profiles</h2>
+                <p class="muted small">K-Means is fitted on the training split only; validation and test records are assigned with the fitted centroids. The exam score target is excluded.</p>
+              </div>
+              <span class="badge badge-info" id="cluster-badge">Loading</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <caption class="sr-only">Descriptive cluster profiles from the exam track</caption>
+                <thead>
+                  <tr><th>Cluster</th><th class="num">Records</th><th class="num">Share</th><th>Profile</th></tr>
+                </thead>
+                <tbody id="cluster-table">
+                  <tr><td colspan="4"><div class="skeleton skeleton-line w-80"></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <div class="grid-2">
+            <section class="card">
+              <div class="card-head">
+                <div>
+                  <h2>Error by group</h2>
+                  <p class="muted small">Held-out mean absolute error across available exam groups. This is not a fairness certification.</p>
+                </div>
+                <span class="badge badge-neutral" id="fairness-badge">Loading</span>
+              </div>
+              <div id="fairness-summary" class="muted small">Loading group comparison…</div>
+              <div class="table-wrap" style="margin-top:12px">
+                <table>
+                  <caption class="sr-only">Exam-model mean absolute error by available group</caption>
+                  <thead>
+                    <tr><th>Group</th><th class="num">Rows</th><th class="num">MAE</th><th class="num">Difference</th></tr>
+                  </thead>
+                  <tbody id="fairness-table">
+                    <tr><td colspan="4"><div class="skeleton skeleton-line w-80"></div></td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <p class="muted small" id="fairness-note" style="margin-top:10px"></p>
+            </section>
+
+            <figure class="card chart-figure">
+              <h2 style="margin-bottom:8px">PCA view</h2>
+              <img id="pca-figure" src="/api/pca/visualization" alt="PCA scatter plots for the exam and placement test splits" loading="lazy">
+              <figcaption id="pca-note" class="muted small">Loading PCA summary…</figcaption>
+            </figure>
+          </div>
+
+          <section class="card">
+            <div class="card-head">
+              <div>
+                <h2>Data health</h2>
+                <p class="muted small">Generated from raw, processed, and split files. Split rows are checked against processed rows.</p>
+              </div>
+              <span class="badge badge-neutral" id="quality-badge">Loading</span>
+            </div>
+            <div class="callout callout-warning" id="quality-alert" hidden>
+              <svg class="icon" aria-hidden="true"><use href="#icon-warning"></use></svg>
+              <div><strong>No genuine student link exists.</strong><p>The source files share no student identifier. Row-order pairing has been removed.</p></div>
+            </div>
+            <div class="stats-grid" id="quality-summary" style="margin-top:14px;margin-bottom:0">
+              <div class="stat-card"><div class="skeleton skeleton-card"></div></div>
+              <div class="stat-card"><div class="skeleton skeleton-card"></div></div>
+              <div class="stat-card"><div class="skeleton skeleton-card"></div></div>
+              <div class="stat-card"><div class="skeleton skeleton-card"></div></div>
+            </div>
+            <details class="details" style="margin-top:14px">
+              <summary>Dataset and split details</summary>
+              <div class="details-body" id="quality-details">
+                <div class="skeleton skeleton-line w-80"></div>
+                <div class="skeleton skeleton-line w-60"></div>
+              </div>
+            </details>
+          </section>
+        </section>
+
+        <section class="view" id="view-recommendations" data-view-panel="recommendations" aria-labelledby="recommendations-title" hidden>
+          <div class="page-intro">
+            <span class="eyebrow">Recommendations</span>
+            <h2 id="recommendations-title">Start a support conversation with transparent prompts.</h2>
+            <p>These prompts are triggered by simple thresholds. They are not model output, causal claims, or institutional decisions. Use them as conversation starters, not verdicts.</p>
+          </div>
+
+          <div class="split-layout">
+            <form class="card form-card" id="advisory-form" novalidate>
+              <div class="card-head">
+                <div>
+                  <span class="eyebrow">Optional inputs</span>
+                  <h3>Which support areas should we check?</h3>
+                </div>
+                <span class="badge badge-accent">Advisory only</span>
+              </div>
+              <p class="form-intro">Enter any subset of fields. The API validates ranges and returns only the prompts whose thresholds are crossed.</p>
+              <div class="form-grid" id="advisory-fields" aria-busy="true">
+                <p class="muted">Loading advisory fields…</p>
+              </div>
+              <div class="form-actions">
+                <button class="button primary" type="submit" id="advisory-submit">Get advisory prompts</button>
+                <button class="button" type="reset">Clear inputs</button>
               </div>
             </form>
-            <div class="card result" id="exam-result">
-              <span class="eyebrow">Result</span>
-              <h3>Waiting for input</h3>
-              <p>Submit the form to call the saved model.</p>
-            </div>
-          </div>
-        </section>
 
-        <section id="placement" class="view hidden">
-          <div class="page-head">
-            <h1>Placement</h1>
-            <p>This form uses the placement dataset only. It does not describe a student in the exam dataset.</p>
-          </div>
-          <div class="two-col form-layout">
-            <form class="card" id="placement-form">
-              <span class="eyebrow">Model</span>
-              <h2 id="placement-model-name">Random Forest Classifier</h2>
-              <p class="muted">Demo inputs only — not a real student record.</p>
-              <div class="form-grid">
-                <div class="field"><label for="place-cgpa">CGPA (0–10)</label><input id="place-cgpa" name="cgpa" type="number" min="0" max="10" step="0.01" value="8.45" required></div>
-                <div class="field"><label for="place-communication">Communication skills (1–10)</label><input id="place-communication" name="communication_skills" type="number" min="1" max="10" value="8" required></div>
-                <div class="field"><label for="place-prev">Previous semester result</label><input id="place-prev" name="prev_sem_result" type="number" min="0" max="10" step="0.1" value="8.2" required></div>
-                <div class="field"><label for="place-iq">IQ</label><input id="place-iq" name="iq" type="number" min="70" max="160" value="115" required></div>
-                <div class="field"><label for="place-projects">Projects completed</label><input id="place-projects" name="projects_completed" type="number" min="0" max="10" value="4" required></div>
-                <div class="field"><label for="place-academic">Academic performance (0–10)</label><input id="place-academic" name="academic_performance" type="number" min="0" max="10" value="8" required></div>
-                <div class="field"><label for="place-extra">Extra-curricular score (0–10)</label><input id="place-extra" name="extra_curricular_score" type="number" min="0" max="10" value="7" required></div>
-                <div class="field"><label for="place-internship">Internship experience</label><select id="place-internship" name="internship_experience"><option value="No" selected>No</option><option value="Yes">Yes</option></select></div>
+            <aside class="card result-card" id="advisory-result" role="region" aria-live="polite" aria-labelledby="advisory-result-title">
+              <div class="result-empty">
+                <svg class="icon" aria-hidden="true"><use href="#icon-lightbulb"></use></svg>
+                <h3 id="advisory-result-title">No prompts yet</h3>
+                <p>Enter one or more optional fields to check the transparent thresholds.</p>
               </div>
-              <div class="actions">
-                <button class="btn primary" type="submit">Predict placement</button>
-                <button class="btn" type="reset">Reset</button>
+            </aside>
+          </div>
+
+          <section class="card">
+            <div class="card-head">
+              <div>
+                <h2>Thresholds used</h2>
+                <p class="muted small">Loaded from the advisory-rules endpoint. Rules are intentionally simple and readable.</p>
               </div>
-            </form>
-            <div class="card result" id="placement-result">
-              <span class="eyebrow">Result</span>
-              <h3>Waiting for input</h3>
-              <p>Submit the form to call the saved model.</p>
             </div>
-          </div>
-        </section>
-
-        <section id="clusters" class="view hidden">
-          <div class="page-head"><h1>Student clusters</h1><p>Unsupervised groupings of exam-track inputs. These are associations, not permanent student labels.</p></div>
-          <div class="card" id="clusters-card"><p class="loading">Loading cluster summary…</p></div>
-        </section>
-
-        <section id="fairness" class="view hidden">
-          <div class="page-head"><h1>Fairness comparison</h1><p>Mean absolute error for the deployed exam regression model across available groups.</p></div>
-          <div class="card" id="fairness-card"><p class="loading">Loading fairness comparison…</p></div>
-        </section>
-
-        <section id="advisory" class="view hidden">
-          <div class="page-head"><h1>Advisory support</h1><p>Enter validated demonstration inputs to receive conservative, explainable prompts separate from model output.</p></div>
-          <form class="card" id="advisory-form">
-            <div class="form-grid">
-              <div class="field"><label for="advisory-attendance">Attendance (%)</label><input id="advisory-attendance" name="attendance" type="number" min="0" max="100"></div>
-              <div class="field"><label for="advisory-previous">Previous score</label><input id="advisory-previous" name="previous_scores" type="number" min="0" max="100"></div>
-              <div class="field"><label for="advisory-communication">Communication skills</label><input id="advisory-communication" name="communication_skills" type="number" min="0" max="10"></div>
-              <div class="field"><label for="advisory-projects">Projects completed</label><input id="advisory-projects" name="projects_completed" type="number" min="0" max="100"></div>
+            <div class="table-wrap">
+              <table>
+                <caption class="sr-only">Advisory thresholds and prompts</caption>
+                <thead>
+                  <tr><th>Field</th><th>Condition</th><th>Prompt</th></tr>
+                </thead>
+                <tbody id="advisory-rules">
+                  <tr><td colspan="3"><div class="skeleton skeleton-line w-80"></div></td></tr>
+                </tbody>
+              </table>
             </div>
-            <div class="actions"><button class="btn primary" type="submit">Get advisory prompts</button></div>
-          </form>
-          <div class="card advisory" id="advisory-result"><p>Suggestions will appear here.</p></div>
+            <p class="muted small" id="advisory-note" style="margin-top:10px"></p>
+          </section>
         </section>
 
-        <section id="quality" class="view hidden">
-          <div class="page-head">
-            <h1>Data quality</h1>
-            <p>Generated by <code>scripts/data_quality.py</code> from the raw, processed, and split files.</p>
+        <section class="view" id="view-models" data-view-panel="models" aria-labelledby="models-title" hidden>
+          <div class="page-intro">
+            <span class="eyebrow">Model insights</span>
+            <h2 id="models-title">Inspect the evidence behind the estimates.</h2>
+            <p>Held-out metrics, five-fold cross-validation, overfitting flags, confusion matrices, feature importance, and leakage checks. Every value is loaded from generated evaluation artifacts.</p>
           </div>
 
-          <div class="cards">
-            <div class="card stat"><span>Genuine student link</span><b id="q-linked">—</b><small id="q-link-note"></small></div>
-            <div class="card stat"><span>Row-order pairing</span><b id="q-synthetic">—</b><small id="q-synthetic-note"></small></div>
-            <div class="card stat"><span>Split row check</span><b id="q-splits">—</b><small id="q-splits-note"></small></div>
-            <div class="card stat"><span>Exam score range</span><b id="q-exam-range">—</b><small>After preprocessing</small></div>
-          </div>
-
-          <div class="two-col">
-            <div class="card">
-              <h2>Exam dataset</h2>
-              <table class="kv"><tbody id="q-exam"></tbody></table>
-            </div>
-            <div class="card">
-              <h2>Placement dataset</h2>
-              <table class="kv"><tbody id="q-placement"></tbody></table>
+          <div class="callout callout-danger">
+            <svg class="icon" aria-hidden="true"><use href="#icon-warning"></use></svg>
+            <div>
+              <strong>Experimental placement result: synthetic, deterministic source.</strong>
+              <p>The placement label is derivable from four features. Near-perfect placement scores are dataset-construction artifacts, not evidence that the placement model will generalize. The deployed forest is deliberately capacity-limited.</p>
             </div>
           </div>
 
-          <div class="card table-card">
-            <h2>Train, validation, and test rows</h2>
-            <table>
-              <thead><tr><th>Track</th><th>Train</th><th>Validation</th><th>Test</th><th>Total</th></tr></thead>
-              <tbody id="q-splits-body"></tbody>
-            </table>
-          </div>
+          <section class="card">
+            <div class="card-head">
+              <div>
+                <h2>Model comparison</h2>
+                <p class="muted small">Held-out test metrics and the reliability status from the overfitting report.</p>
+              </div>
+              <span class="badge badge-info" id="comparison-badge">Loading</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <caption class="sr-only">All evaluated models with held-out test metrics and status</caption>
+                <thead>
+                  <tr><th>Track</th><th>Model</th><th>Preprocessing</th><th>Test metrics</th><th>Status</th></tr>
+                </thead>
+                <tbody id="comparison-body">
+                  <tr><td colspan="5"><div class="skeleton skeleton-line w-80"></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
 
-          <div class="card table-card">
-            <h2>Preprocessing and range checks</h2>
-            <div class="issues" id="q-issues">Loading…</div>
-          </div>
+          <section class="card">
+            <div class="card-head">
+              <div>
+                <h2>Five-fold cross-validation</h2>
+                <p class="muted small">Mean ± standard deviation on the training split only. Preprocessing and the zero-variance filter are refitted inside every fold.</p>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <caption class="sr-only">Five-fold cross-validation metrics</caption>
+                <thead>
+                  <tr><th>Track</th><th>Model</th><th>Metrics (mean ± std)</th></tr>
+                </thead>
+                <tbody id="cv-body">
+                  <tr><td colspan="3"><div class="skeleton skeleton-line w-80"></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <details class="details" open>
+            <summary>Train / validation / test comparison</summary>
+            <div class="details-body">
+              <p class="muted small">Each cell is training / validation / test. Large train-to-test gaps are flagged in the next section.</p>
+              <div class="table-wrap" style="margin-top:10px">
+                <table>
+                  <caption class="sr-only">Train, validation, and test metrics by model</caption>
+                  <thead>
+                    <tr><th>Track</th><th>Model</th><th>Metrics</th></tr>
+                  </thead>
+                  <tbody id="split-body">
+                    <tr><td colspan="3"><div class="skeleton skeleton-line w-80"></div></td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </details>
+
+          <details class="details" open>
+            <summary>Overfitting and reliability flags</summary>
+            <div class="details-body">
+              <div id="overfit-warnings" class="callout callout-warning" style="margin-bottom:12px">
+                <svg class="icon" aria-hidden="true"><use href="#icon-warning"></use></svg>
+                <div>Loading flags…</div>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <caption class="sr-only">Overfitting, variance, and reliability flags</caption>
+                  <thead>
+                    <tr><th>Track</th><th>Model</th><th>Headline metric (train / val / test / CV)</th><th>Flags</th><th>Status</th></tr>
+                  </thead>
+                  <tbody id="overfit-body">
+                    <tr><td colspan="5"><div class="skeleton skeleton-line w-80"></div></td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </details>
+
+          <details class="details">
+            <summary>Confusion matrices</summary>
+            <div class="details-body">
+              <p class="muted small">Held-out test split. Labels: 0 = not placed, 1 = placed.</p>
+              <div class="matrix-grid" id="confusion-grid" style="margin-top:12px">
+                <div class="skeleton skeleton-card"></div>
+                <div class="skeleton skeleton-card"></div>
+              </div>
+            </div>
+          </details>
+
+          <details class="details">
+            <summary>Feature importance</summary>
+            <div class="details-body">
+              <p class="muted small">Permutation importance on the held-out test split. Association with prediction is not a causal effect.</p>
+              <div id="importance-body" class="bar-list" style="margin-top:12px">
+                <div class="skeleton skeleton-line w-80"></div>
+                <div class="skeleton skeleton-line w-60"></div>
+              </div>
+            </div>
+          </details>
+
+          <details class="details" open>
+            <summary>Leakage and deterministic-rule investigation</summary>
+            <div class="details-body">
+              <div id="leakage-body">
+                <div class="skeleton skeleton-line w-80"></div>
+                <div class="skeleton skeleton-line w-60"></div>
+              </div>
+              <div id="investigation-body" style="margin-top:16px">
+                <div class="skeleton skeleton-line w-80"></div>
+                <div class="skeleton skeleton-line w-60"></div>
+              </div>
+            </div>
+          </details>
         </section>
+      </main>
 
-        <section id="models" class="view hidden">
-          <div class="page-head">
-            <span class="eyebrow">Model performance</span>
-            <h1>Model comparison</h1>
-            <p>Test metrics, five-fold cross-validation, train/validation/test comparisons, overfitting checks, confusion matrices, and feature importance. Every value is loaded from the generated evaluation files.</p>
-          </div>
-
-          <div class="warning">
-            <b>Experimental result — synthetic data limitation.</b>
-            <p>The placement source is synthetic and its label is deterministic. The source files were historically paired by row order and share no genuine student identifier. Near-perfect placement scores are dataset-construction artifacts, not evidence that the placement Random Forest is reliable in the real world.</p>
-          </div>
-
-          <div class="card table-card">
-            <h2>Model comparison</h2>
-            <p class="muted">Held-out test metrics and the overfitting/reliability status from <code>outputs/evaluation/</code>.</p>
-            <table>
-              <thead><tr><th>Track</th><th>Model</th><th>Preprocessing</th><th>Test metrics</th><th>Status</th></tr></thead>
-              <tbody id="comparison-body"></tbody>
-            </table>
-          </div>
-
-          <div class="card table-card">
-            <h2>Five-fold cross-validation</h2>
-            <p class="muted">Mean ± standard deviation across folds of the training split. Preprocessing and the zero-variance filter are refitted inside every fold; validation and test data are not used.</p>
-            <table>
-              <thead><tr><th>Track</th><th>Model</th><th>Metrics (mean ± std)</th></tr></thead>
-              <tbody id="cv-body"></tbody>
-            </table>
-          </div>
-
-          <div class="card table-card">
-            <h2>Train / validation / test comparison</h2>
-            <p class="muted">Each cell is training / validation / test. Large train-to-test gaps are flagged below.</p>
-            <table>
-              <thead><tr><th>Track</th><th>Model</th><th>Metrics</th></tr></thead>
-              <tbody id="split-body"></tbody>
-            </table>
-          </div>
-
-          <div class="card table-card">
-            <h2>Overfitting, variance, and reliability flags</h2>
-            <div id="overfit-warning" class="issues"></div>
-            <table>
-              <thead><tr><th>Track</th><th>Model</th><th>Headline metric (train / val / test / CV)</th><th>Flags</th><th>Status</th></tr></thead>
-              <tbody id="overfit-body"></tbody>
-            </table>
-          </div>
-
-          <div class="card table-card">
-            <h2>Classification summary</h2>
-            <p class="muted">Confusion matrices on the held-out test split. Labels: 0 = not placed, 1 = placed.</p>
-            <div id="confusion-body" class="matrix-grid"></div>
-          </div>
-
-          <div class="card table-card">
-            <h2>Feature importance</h2>
-            <div id="importance-body">Loading explanations…</div>
-          </div>
-
-          <div class="card table-card">
-            <h2>Leakage investigation</h2>
-            <div class="issues" id="leakage-body">Loading leakage checks…</div>
-          </div>
-
-          <div class="card table-card">
-            <h2>Why the placement score is high</h2>
-            <div class="issues" id="investigation-body">Loading investigation…</div>
-          </div>
-        </section>
-
-        <section id="notes" class="view hidden">
-          <div class="page-head">
-            <h1>Notes</h1>
-            <p>What this project does, and what it does not do.</p>
-          </div>
-          <div class="card notes">
-            <h2>Scope</h2>
-            <p>The project prepares two unrelated datasets, trains baseline models, and reports their test-set metrics. Exam score is a regression task. Placement is a binary classification task.</p>
-
-            <h2>Data limitation</h2>
-            <p>The exam file has no student identifier. The placement file has <code>College_ID</code>, but the exam file has no matching column. No row-order combined file exists in this version. Each track is split into train, validation, and test sets independently.</p>
-
-            <h2>Preprocessing and validation</h2>
-            <p>Imputation, scaling, and one-hot encoding live inside each scikit-learn pipeline and are fitted on the training split only. Every model is also evaluated with five-fold cross-validation. Training-versus-test gaps are written to <code>outputs/metrics/overfitting_analysis.csv</code>.</p>
-
-            <h2>What is not claimed</h2>
-            <p>No student-level link is claimed. No production accuracy is claimed. The placement label is deterministic in the source dataset; the investigation report explains why an unrestricted forest reaches a perfect score and why the deployed model is deliberately capacity-limited.</p>
-
-            <h2>How to rebuild</h2>
-            <p>Run the commands from the repository root:</p>
-            <p><code>python scripts/preprocess.py</code><br>
-            <code>python scripts/dataset_checks.py</code><br>
-            <code>python scripts/select_and_split.py</code><br>
-            <code>python scripts/data_quality.py</code><br>
-            <code>python scripts/pca_analysis.py</code><br>
-            <code>python scripts/run_eda.py</code><br>
-            <code>python scripts/train_baselines.py</code><br>
-            <code>python scripts/analyze_baselines.py</code></p>
-            <p>Then start the app with <code>python app.py</code>.</p>
-          </div>
-        </section>
-      </div>
-    </main>
+      <footer class="footer">
+        <span>Independent datasets. Experimental models. No production accuracy claim.</span>
+        <span>Flask, scikit-learn, and vanilla JavaScript. <a href="/llms.txt">Machine-readable index</a></span>
+      </footer>
+    </div>
   </div>
 
-  <script>
-    const $ = (selector) => document.querySelector(selector);
-    const all = (selector) => document.querySelectorAll(selector);
-    const labels = {
-      overview: "Overview",
-      exam: "Exam score",
-      placement: "Placement",
-      clusters: "Student clusters",
-      fairness: "Fairness",
-      advisory: "Advisory support",
-      quality: "Data quality",
-      models: "Model performance",
-      notes: "Notes",
-    };
-
-    function show(view) {
-      all(".view").forEach((item) => item.classList.toggle("hidden", item.id !== view));
-      all(".nav button").forEach((item) => item.classList.toggle("active", item.dataset.view === view));
-      $("#page-name").textContent = labels[view] || "";
-      if (location.hash !== `#${view}`) history.replaceState(null, "", `#${view}`);
-    }
-
-    all(".nav button").forEach((button) => button.addEventListener("click", () => show(button.dataset.view)));
-    all("[data-go]").forEach((button) => button.addEventListener("click", () => show(button.dataset.go)));
-    $("#print").addEventListener("click", () => window.print());
-
-    async function api(url, options) {
-      const response = await fetch(url, options);
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Request failed");
-      return data;
-    }
-
-    const int = (value) => (value == null ? "—" : Number(value).toLocaleString());
-    const dec = (value, digits = 2) => (value == null ? "—" : Number(value).toFixed(digits));
-    const pct = (value, digits = 1) => (value == null ? "—" : `${(Number(value) * 100).toFixed(digits)}%`);
-    const kv = (label, value) => `<tr><th>${label}</th><td>${value}</td></tr>`;
-    const tile = (label, value) => `<div class="metric"><small>${label}</small><strong>${value}</strong></div>`;
-    const suggestions = (items) => items && items.length
-      ? `<div class="advisory"><b>Advisory suggestions</b><ul>${items.map((item) => `<li>${item}</li>`).join("")}</ul><small>These are not guarantees or institutional decisions.</small></div>`
-      : `<div class="advisory">No specific prompts for these inputs. This is not a guarantee of any outcome.</div>`;
-
-    async function loadClusters() {
-      try {
-        const data = await api("/api/clusters");
-        const max = Math.max(...Object.values(data.cluster_counts));
-        $("#clusters-card").innerHTML =
-          `<p><b>${data.method}</b> across ${int(data.rows)} records; silhouette score ${dec(data.silhouette_score, 3)}.</p>` +
-          `<table><thead><tr><th>Cluster</th><th>Count</th><th>Relative size</th><th>Description</th></tr></thead><tbody>` +
-          data.cluster_centers.map((cluster) =>
-            `<tr><td>${cluster.cluster}</td><td>${int(cluster.count)}</td><td><div class="bar"><span style="width:${(cluster.count / max) * 100}%"></span></div></td><td>${cluster.description}</td></tr>`
-          ).join("") + `</tbody></table><p class="muted">${data.limitations.join(" ")}</p>`;
-      } catch (error) {
-        $("#clusters-card").innerHTML = `<p class="error">${error.message}</p>`;
-      }
-    }
-
-    async function loadFairness() {
-      try {
-        const data = await api("/api/fairness");
-        $("#fairness-card").innerHTML =
-          `<table><thead><tr><th>Group</th><th>Group size</th><th>MAE</th></tr></thead><tbody>` +
-          data.results.map((row) => `<tr><td>${row.group_column}: ${row.group}</td><td>${int(row.group_size)}</td><td>${dec(row.mean_absolute_error, 3)}</td></tr>`).join("") +
-          `</tbody></table><p class="muted">${data.limitations.join(" ")}</p>`;
-      } catch (error) {
-        $("#fairness-card").innerHTML = `<p class="error">${error.message}</p>`;
-      }
-    }
-
-    async function loadSummary() {
-      const data = await api("/api/summary");
-      $("#link-warning").textContent = data.investigation ||
-        "No shared student identifier was found between the two source files.";
-      $("#stat-exam-rows").textContent = int(data.exam_rows);
-      $("#stat-exam-cols").textContent = `${int(data.exam_columns)} columns after encoding`;
-      $("#stat-exam-mean").textContent = dec(data.exam_mean, 2);
-      $("#stat-exam-range").textContent = `Range ${data.exam_min} to ${data.exam_max}`;
-      $("#stat-placement-rows").textContent = int(data.placement_rows);
-      $("#stat-placement-cols").textContent = `${int(data.placement_columns)} columns after encoding`;
-      $("#stat-placement-rate").textContent = pct(data.placement_rate);
-      $("#stat-placement-counts").textContent =
-        `${int(data.placement_placed)} placed, ${int(data.placement_unplaced)} not placed`;
-      if (data.deployed_models) {
-        $("#exam-model-name").textContent = data.deployed_models.exam;
-        $("#placement-model-name").textContent = data.deployed_models.placement;
-      }
-    }
-
-    async function loadMetrics() {
-      const rows = await api("/api/metrics");
-      const exam = rows.find((row) => row.task === "exam_score_regression" && row.model === "LinearRegression");
-      const logistic = rows.find((row) => row.task === "placement_classification" && row.model === "LogisticRegression");
-      const placement = rows.find((row) => row.task === "placement_classification" && row.model === "RandomForestClassifier");
-
-      if (exam) {
-        $("#exam-metrics").innerHTML =
-          tile("MAE", dec(exam.MAE, 3)) + tile("RMSE", dec(exam.RMSE, 3)) + tile("R²", dec(exam.R2, 3));
-      }
-      if (logistic && placement) {
-        $("#placement-metrics").innerHTML =
-          tile("F1 · logistic", pct(logistic.F1)) +
-          tile("ROC-AUC · logistic", dec(logistic.ROC_AUC, 3)) +
-          tile("F1 · random forest", pct(placement.F1));
-      }
-    }
-
-    async function loadModelPerformance() {
-      const [performance, cv, overfit, importance, leakage, investigation] = await Promise.all([
-        api("/api/model-performance"),
-        api("/api/cross-validation"),
-        api("/api/overfitting"),
-        api("/api/feature-importance"),
-        api("/api/leakage"),
-        api("/api/placement-investigation"),
-      ]);
-
-      const models = performance.models || [];
-      const summaryByKey = new Map();
-      (overfit.summary || []).forEach((row) => {
-        summaryByKey.set(`${row.task}|${row.model}`, row);
-      });
-      const track = (task) => (task === "exam_score" ? "Exam" : "Placement");
-      const statusLabel = { ok: "OK", review: "Review", critical: "Experimental / suspicious" };
-      const ms = (mean, std, digits = 3) =>
-        mean == null ? "—" : `${dec(mean, digits)} ± ${dec(std, digits)}`;
-
-      $("#comparison-body").innerHTML = models.map((model) => {
-        const summary = summaryByKey.get(`${model.task}|${model.model}`) || {};
-        const test = model.metrics.test;
-        const testText = model.task === "exam_score"
-          ? `MAE ${dec(test.MAE, 3)} · RMSE ${dec(test.RMSE, 3)} · R² ${dec(test.R2, 3)}`
-          : `Accuracy ${pct(test.Accuracy)} · F1 ${pct(test.F1)} · ROC-AUC ${dec(test.ROC_AUC, 3)}`;
-        const status = summary.status || "ok";
-        const deployed = model.deployed ? ` <span class="badge">deployed</span>` : "";
-        return `<tr><td>${track(model.task)}</td><td>${model.model}${deployed}</td><td>${model.preprocessing}</td><td>${testText}</td><td><span class="status-${status}">${statusLabel[status] || status}</span></td></tr>`;
-      }).join("");
-
-      const cvGroups = new Map();
-      for (const row of cv.results || []) {
-        const key = `${row.task}|${row.model}`;
-        if (!cvGroups.has(key)) cvGroups.set(key, { task: row.task, model: row.model, metrics: {} });
-        cvGroups.get(key).metrics[row.metric] = row;
-      }
-      $("#cv-body").innerHTML = [...cvGroups.values()].map((group) => {
-        const m = group.metrics;
-        const values = group.task === "exam_score"
-          ? `MAE ${ms(m.MAE?.mean, m.MAE?.std, 3)} · RMSE ${ms(m.RMSE?.mean, m.RMSE?.std, 3)} · R² ${ms(m.R2?.mean, m.R2?.std, 3)}`
-          : `Accuracy ${ms(m.Accuracy?.mean, m.Accuracy?.std, 3)} · Precision ${ms(m.Precision?.mean, m.Precision?.std, 3)} · Recall ${ms(m.Recall?.mean, m.Recall?.std, 3)} · F1 ${ms(m.F1?.mean, m.F1?.std, 3)} · ROC-AUC ${ms(m.ROC_AUC?.mean, m.ROC_AUC?.std, 3)}`;
-        return `<tr><td>${track(group.task)}</td><td>${group.model}</td><td>${values}</td></tr>`;
-      }).join("");
-
-      $("#split-body").innerHTML = models.map((model) => {
-        const { train, val, test } = model.metrics;
-        const values = model.task === "exam_score"
-          ? `<span class="metric-tight"><b>MAE</b> ${dec(train.MAE, 3)} / ${dec(val.MAE, 3)} / ${dec(test.MAE, 3)}<br><b>RMSE</b> ${dec(train.RMSE, 3)} / ${dec(val.RMSE, 3)} / ${dec(test.RMSE, 3)}<br><b>R²</b> ${dec(train.R2, 3)} / ${dec(val.R2, 3)} / ${dec(test.R2, 3)}</span>`
-          : `<span class="metric-tight"><b>Accuracy</b> ${dec(train.Accuracy, 3)} / ${dec(val.Accuracy, 3)} / ${dec(test.Accuracy, 3)}<br><b>F1</b> ${dec(train.F1, 3)} / ${dec(val.F1, 3)} / ${dec(test.F1, 3)}<br><b>ROC-AUC</b> ${dec(train.ROC_AUC, 3)} / ${dec(val.ROC_AUC, 3)} / ${dec(test.ROC_AUC, 3)}</span>`;
-        return `<tr><td>${track(model.task)}</td><td>${model.model}</td><td>${values}</td></tr>`;
-      }).join("");
-
-      $("#overfit-warning").innerHTML =
-        `<ul class="warning-list">${(overfit.global_warnings || []).map((item) => `<li>${item}</li>`).join("")}</ul>`;
-      $("#overfit-body").innerHTML = (overfit.summary || []).map((row) => {
-        const gap = row.headline_gap == null ? null : Number(row.headline_gap);
-        const gapText = gap == null ? "—" : `${gap >= 0 ? "+" : ""}${gap.toFixed(3)}`;
-        return `<tr><td>${track(row.task)}</td><td>${row.model}</td><td>${row.headline_metric}: ${dec(row.headline_train, 3)} / ${dec(row.headline_validation, 3)} / ${dec(row.headline_test, 3)} / ${ms(row.headline_cv_mean, row.headline_cv_std, 3)}<br><span class="muted">gap ${gapText}</span></td><td>${row.flag_text}</td><td><span class="status-${row.status}">${statusLabel[row.status] || row.status}</span></td></tr>`;
-      }).join("");
-
-      const classificationModels = models.filter((model) => model.task === "placement" && model.confusion_matrix);
-      $("#confusion-body").innerHTML = classificationModels.map((model) => {
-        const matrix = model.confusion_matrix.matrix;
-        const test = model.metrics.test;
-        return `<div><h3>${model.model}</h3><table class="matrix"><thead><tr><th></th><th>Predicted 0</th><th>Predicted 1</th></tr></thead><tbody><tr><th>Actual 0</th><td>${int(matrix[0][0])}</td><td>${int(matrix[0][1])}</td></tr><tr><th>Actual 1</th><td>${int(matrix[1][0])}</td><td>${int(matrix[1][1])}</td></tr></tbody></table><p class="matrix-note muted">Precision ${pct(test.Precision)} · Recall ${pct(test.Recall)} · F1 ${pct(test.F1)} · ROC-AUC ${dec(test.ROC_AUC, 3)}</p></div>`;
-      }).join("");
-
-      const importanceGroup = (taskKey, title) => {
-        const block = (importance.tasks || {})[taskKey];
-        if (!block) return "";
-        return `<div class="importance-group"><h3>${title}</h3>` + (block.models || []).map((model) => {
-          const rows = (model.top_permutation_features || []).slice(0, 6);
-          const max = Math.max(...rows.map((row) => Math.max(0, Number(row.importance) || 0)), 0.000001);
-          const bars = rows.map((row) => {
-            const value = Math.max(0, Number(row.importance) || 0);
-            return `<div class="importance-row"><span>${row.feature}</span><div class="importance-bar"><i style="width:${(value / max * 100).toFixed(1)}%"></i></div><span class="importance-value">${dec(row.importance, 4)}</span></div>`;
-          }).join("");
-          return `<div class="importance-model"><p><b>${model.model}</b> — permutation importance on the test split</p>${bars}</div>`;
-        }).join("") + `</div>`;
-      };
-      $("#importance-body").innerHTML =
-        `<p class="muted">${(importance.caveats || []).slice(0, 3).join(" ")}</p>` +
-        importanceGroup("exam_score", "Exam score") +
-        importanceGroup("placement", "Placement (experimental)");
-
-      const failingChecks = (leakage.checks || []).filter((check) =>
-        !check.result && (check.severity === "critical" || check.severity === "review")
-      );
-      $("#leakage-body").innerHTML =
-        `<p><b>Verdict:</b> ${leakage.verdict}</p>` +
-        `<p><b>Placement rule check:</b> accuracy ${pct(leakage.placement_rule?.accuracy, 2)} with ${int(leakage.placement_rule?.errors)} error(s). The target is derivable from four features.</p>` +
-        `<ul>${failingChecks.map((check) => `<li>${check.task}: ${check.check} — ${check.value} (${check.severity})</li>`).join("")}</ul>`;
-
-      const rule = investigation.deterministic_label_rule;
-      const unconstrained = investigation.unconstrained_random_forest;
-      const constrained = investigation.constrained_random_forest;
-      $("#investigation-body").innerHTML =
-        `<p>${rule.description}</p>` +
-        `<ul>` +
-        `<li>Rule accuracy on all ${int(rule.rows)} placement rows: ${pct(rule.accuracy, 2)} (${int(rule.errors)} errors).</li>` +
-        `<li>Majority-class baseline: ${pct(investigation.majority_class_baseline_accuracy, 2)}.</li>` +
-        `<li>Unconstrained Random Forest: accuracy ${pct(unconstrained.Accuracy, 2)}, F1 ${pct(unconstrained.F1, 2)}. Diagnostic only; not a reliable model.</li>` +
-        `<li>Deployed depth-limited Random Forest: accuracy ${pct(constrained.Accuracy, 2)}, F1 ${pct(constrained.F1, 2)}.</li>` +
-        `</ul><p>${investigation.conclusion}</p>`;
-    }
-
-    async function loadQuality() {
-      const report = await api("/api/data-quality");
-      const exam = report.datasets.exam_processed;
-      const examRaw = report.datasets.exam_raw;
-      const placement = report.datasets.placement_processed;
-      const placementRaw = report.datasets.placement_raw;
-      const link = report.linkage;
-
-      $("#q-linked").textContent = link.genuinely_linked ? "Yes" : "No";
-      $("#q-link-note").textContent = link.shared_student_identifier
-        ? `Shared key: ${link.shared_student_identifier}`
-        : "No shared student identifier.";
-      $("#q-synthetic").textContent = link.row_order_pairing_status === "removed" ? "Removed" : "Not used";
-      $("#q-synthetic-note").textContent = "No combined dataset or synthetic pair ID exists.";
-      const matches = Object.values(report.split_row_totals || {}).every((item) => item.matches_processed);
-      $("#q-splits").textContent = matches ? "Match" : "Mismatch";
-      $("#q-splits-note").textContent = "Split rows equal processed rows.";
-      $("#q-exam-range").textContent =
-        `${exam.target_summary.min} to ${exam.target_summary.max}`;
-
-      $("#q-exam").innerHTML =
-        kv("Raw rows", int(examRaw.rows)) +
-        kv("Processed rows", int(exam.rows)) +
-        kv("Columns after encoding", int(exam.columns)) +
-        kv("Missing values", int(exam.missing_values_total)) +
-        kv("Duplicate rows", int(exam.duplicate_rows)) +
-        kv("Exam score mean", dec(exam.target_summary.mean, 2)) +
-        kv("Exam score std", dec(exam.target_summary.std, 2));
-
-      const classes = placement.target_summary.counts || {};
-      $("#q-placement").innerHTML =
-        kv("Raw rows", int(placementRaw.rows)) +
-        kv("Processed rows", int(placement.rows)) +
-        kv("Columns after encoding", int(placement.columns)) +
-        kv("Missing values", int(placement.missing_values_total)) +
-        kv("Duplicate rows", int(placement.duplicate_rows)) +
-        kv("Not placed (0)", int(classes["0"] || 0)) +
-        kv("Placed (1)", int(classes["1"] || 0)) +
-        kv("Placed share", pct(placement.target_summary.positive_share));
-
-      $("#q-splits-body").innerHTML = ["exam_score", "placement"].map((track) => {
-        const split = report.splits[track];
-        const total = split.train.rows + split.val.rows + split.test.rows;
-        return `<tr><td>${track === "exam_score" ? "Exam" : "Placement"}</td><td>${int(split.train.rows)}</td><td>${int(split.val.rows)}</td><td>${int(split.test.rows)}</td><td>${int(total)}</td></tr>`;
-      }).join("");
-
-      const issues = [];
-      for (const [name, ranges] of Object.entries(report.invalid_ranges || {})) {
-        for (const [column, count] of Object.entries(ranges)) {
-          issues.push(`${name}: ${column} had ${int(count)} value(s) outside the allowed range.`);
-        }
-      }
-      for (const [name, columns] of Object.entries(report.unexpected_categories || {})) {
-        for (const [column, values] of Object.entries(columns)) {
-          issues.push(`${name}: ${column} had unexpected categories: ${values.join(", ")}.`);
-        }
-      }
-
-      const processing = report.processing || {};
-      const pieces = [];
-      if (processing.exam) {
-        pieces.push(`Exam: removed ${int(processing.exam.incomplete_rows_removed)} incomplete rows and ${int(processing.exam.duplicates_removed)} duplicate rows; bounded ${int(processing.exam.exam_scores_bounded)} exam score(s).`);
-      }
-      if (processing.placement) {
-        pieces.push(`Placement: removed ${int(processing.placement.duplicates_removed)} duplicate rows; bounded ${int(processing.placement.cgpa_values_bounded)} CGPA value(s).`);
-      }
-      const issueHtml = issues.length
-        ? `<b>Raw-file findings (handled during preprocessing):</b><ul>${issues.map((item) => `<li>${item}</li>`).join("")}</ul>`
-        : "<p>No invalid ranges or unexpected categories were found.</p>";
-      $("#q-issues").innerHTML = `<p>${pieces.join(" ")}</p>${issueHtml}`;
-    }
-
-    async function loadPca() {
-      try {
-        const report = await api("/api/pca");
-        const exam = report.exam_score;
-        const placement = report.placement;
-        $("#pca-note").textContent =
-          `Exam track: PC1 explains ${(exam.explained_variance_ratio[0] * 100).toFixed(1)}% and PC2 ${(exam.explained_variance_ratio[1] * 100).toFixed(1)}%. ` +
-          `Placement track: PC1 ${(placement.explained_variance_ratio[0] * 100).toFixed(1)}% and PC2 ${(placement.explained_variance_ratio[1] * 100).toFixed(1)}%. ` +
-          "Colors show each track's target. Targets were not used to fit PCA.";
-      } catch (error) {
-        $("#pca-image").style.display = "none";
-        $("#pca-note").textContent = "PCA output is not available. Run python scripts/pca_analysis.py.";
-      }
-    }
-
-    $("#exam-form").addEventListener("submit", async (event) => {
-      event.preventDefault();
-      const result = $("#exam-result");
-      try {
-        const data = await api("/api/predict/exam", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(Object.fromEntries(new FormData(event.target).entries())),
-        });
-        const interval = data.interval
-          ? `Estimated interval: ${data.interval[0]} to ${data.interval[1]} points (${data.interval_basis}).`
-          : "No interval is available because the metrics file is missing.";
-        result.innerHTML =
-          `<span class="eyebrow">Result</span>` +
-          `<div class="big">${data.rounded_score}<span>/100</span></div>` +
-          `<p><b>${data.tier}.</b> ${interval}</p>` +
-          `<p>Model: ${data.model}. This estimate is not guaranteed.</p>` +
-          suggestions(data.advisory_suggestions);
-      } catch (error) {
-        result.innerHTML = `<span class="eyebrow">Result</span><p class="error">${error.message}</p>`;
-      }
-    });
-
-    $("#placement-form").addEventListener("submit", async (event) => {
-      event.preventDefault();
-      const result = $("#placement-result");
-      try {
-        const data = await api("/api/predict/placement", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(Object.fromEntries(new FormData(event.target).entries())),
-        });
-        result.innerHTML =
-          `<span class="eyebrow">Result</span>` +
-          `<div class="big">${data.percentage}<span>% probability</span></div>` +
-          `<p>${data.warning}</p><p>Model: ${data.model}. This is not a guarantee.</p>` +
-          suggestions(data.advisory_suggestions);
-      } catch (error) {
-        result.innerHTML = `<span class="eyebrow">Result</span><p class="error">${error.message}</p>`;
-      }
-    });
-
-    $("#advisory-form").addEventListener("submit", async (event) => {
-      event.preventDefault();
-      const result = $("#advisory-result");
-      result.innerHTML = `<p class="loading">Loading advisory prompts…</p>`;
-      try {
-        const data = await api("/api/interventions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(Object.fromEntries(new FormData(event.target).entries())),
-        });
-        result.innerHTML = suggestions(data.suggestions);
-      } catch (error) {
-        result.innerHTML = `<p class="error">${error.message}</p>`;
-      }
-    });
-
-    loadSummary().catch((error) => console.error(error));
-    loadMetrics().catch((error) => console.error(error));
-    loadModelPerformance().catch((error) => {
-      $("#comparison-body").innerHTML =
-        `<tr><td colspan="5" class="error">Model performance output is not available. Run python scripts/train_models.py, scripts/cross_validation.py, scripts/overfitting_analysis.py, scripts/leakage_investigation.py, and scripts/explain_models.py.</td></tr>`;
-      $("#investigation-body").textContent =
-        "Validation output is not available. Run the evaluation scripts.";
-      console.error(error);
-    });
-    loadQuality().catch((error) => {
-      $("#q-issues").textContent = "Data-quality output is not available. Run python scripts/data_quality.py.";
-    });
-    loadPca();
-    loadClusters();
-    loadFairness();
-
-    if (location.hash && document.getElementById(location.hash.slice(1))) {
-      show(location.hash.slice(1));
-    }
-  </script>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="/assets/app.js" defer></script>
 </body>
 </html>
