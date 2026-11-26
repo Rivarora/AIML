@@ -118,9 +118,10 @@ def _validate_category_column(
     frame: pd.DataFrame, column: str, allowed: set[str], name: str
 ) -> None:
     series = frame[column]
-    if not pd.api.types.is_string_dtype(series):
+    non_null = series.dropna()
+    if not non_null.map(lambda value: isinstance(value, str)).all():
         raise ValueError(f"{name}.{column} must contain text categories, got {series.dtype}.")
-    unexpected = sorted(set(series.dropna().unique()) - allowed)
+    unexpected = sorted(set(non_null.unique()) - allowed)
     if unexpected:
         raise ValueError(f"{name}.{column} contains unexpected categories: {unexpected}")
 

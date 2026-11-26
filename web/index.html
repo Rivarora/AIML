@@ -175,6 +175,11 @@
     .result p { color: var(--muted); }
     .result p b { color: var(--ink); }
     .error { color: var(--bad); }
+    .loading { color: var(--muted); }
+    .bar { background: #e8e7e2; border-radius: 4px; height: 8px; margin-top: 4px; overflow: hidden; }
+    .bar span { background: var(--accent); display: block; height: 100%; }
+    .advisory { background: var(--accent-soft); border-radius: 5px; margin-top: 12px; padding: 10px 12px; }
+    .advisory ul { margin: 5px 0 0; padding-left: 18px; }
 
     table { border-collapse: collapse; width: 100%; }
     th, td { border-bottom: 1px solid var(--line); padding: 9px 6px; text-align: left; vertical-align: top; }
@@ -261,6 +266,9 @@
         <button data-view="overview" class="active">Overview</button>
         <button data-view="exam">Exam score</button>
         <button data-view="placement">Placement</button>
+        <button data-view="clusters">Student clusters</button>
+        <button data-view="fairness">Fairness</button>
+        <button data-view="advisory">Advisory support</button>
         <button data-view="quality">Data quality</button>
         <button data-view="models">Model performance</button>
         <button data-view="notes">Notes</button>
@@ -334,11 +342,12 @@
             <form class="card" id="exam-form">
               <span class="eyebrow">Model</span>
               <h2 id="exam-model-name">Linear Regression</h2>
+              <p class="muted">Demo inputs only — not a real student record.</p>
               <div class="form-grid">
                 <div class="field"><label for="exam-hours">Hours studied per week</label><input id="exam-hours" name="hours_studied" type="number" min="0" max="50" value="24" required></div>
                 <div class="field"><label for="exam-attendance">Attendance (%)</label><input id="exam-attendance" name="attendance" type="number" min="0" max="100" value="88" required></div>
                 <div class="field"><label for="exam-previous">Previous scores</label><input id="exam-previous" name="previous_scores" type="number" min="0" max="100" value="74" required></div>
-                <div class="field"><label for="exam-tutoring">Tutoring sessions</label><input id="exam-tutoring" name="tutoring_sessions" type="number" min="0" max="10" value="3" required></div>
+                <div class="field"><label for="exam-tutoring">Tutoring sessions</label><input id="exam-tutoring" name="tutoring_sessions" type="number" min="0" max="100" value="3" required></div>
                 <div class="field"><label for="exam-resources">Access to resources</label><select id="exam-resources" name="access_to_resources"><option value="Low">Low</option><option value="Medium" selected>Medium</option><option value="High">High</option></select></div>
                 <div class="field"><label for="exam-involvement">Parental involvement</label><select id="exam-involvement" name="parental_involvement"><option value="Low">Low</option><option value="Medium" selected>Medium</option><option value="High">High</option></select></div>
                 <div class="field"><label for="exam-education">Parental education</label><select id="exam-education" name="parental_education_level"><option value="High School">High School</option><option value="College" selected>College</option><option value="Postgraduate">Postgraduate</option></select></div>
@@ -366,6 +375,7 @@
             <form class="card" id="placement-form">
               <span class="eyebrow">Model</span>
               <h2 id="placement-model-name">Random Forest Classifier</h2>
+              <p class="muted">Demo inputs only — not a real student record.</p>
               <div class="form-grid">
                 <div class="field"><label for="place-cgpa">CGPA (0–10)</label><input id="place-cgpa" name="cgpa" type="number" min="0" max="10" step="0.01" value="8.45" required></div>
                 <div class="field"><label for="place-communication">Communication skills (1–10)</label><input id="place-communication" name="communication_skills" type="number" min="1" max="10" value="8" required></div>
@@ -387,6 +397,30 @@
               <p>Submit the form to call the saved model.</p>
             </div>
           </div>
+        </section>
+
+        <section id="clusters" class="view hidden">
+          <div class="page-head"><h1>Student clusters</h1><p>Unsupervised groupings of exam-track inputs. These are associations, not permanent student labels.</p></div>
+          <div class="card" id="clusters-card"><p class="loading">Loading cluster summary…</p></div>
+        </section>
+
+        <section id="fairness" class="view hidden">
+          <div class="page-head"><h1>Fairness comparison</h1><p>Mean absolute error for the deployed exam regression model across available groups.</p></div>
+          <div class="card" id="fairness-card"><p class="loading">Loading fairness comparison…</p></div>
+        </section>
+
+        <section id="advisory" class="view hidden">
+          <div class="page-head"><h1>Advisory support</h1><p>Enter validated demonstration inputs to receive conservative, explainable prompts separate from model output.</p></div>
+          <form class="card" id="advisory-form">
+            <div class="form-grid">
+              <div class="field"><label for="advisory-attendance">Attendance (%)</label><input id="advisory-attendance" name="attendance" type="number" min="0" max="100"></div>
+              <div class="field"><label for="advisory-previous">Previous score</label><input id="advisory-previous" name="previous_scores" type="number" min="0" max="100"></div>
+              <div class="field"><label for="advisory-communication">Communication skills</label><input id="advisory-communication" name="communication_skills" type="number" min="0" max="10"></div>
+              <div class="field"><label for="advisory-projects">Projects completed</label><input id="advisory-projects" name="projects_completed" type="number" min="0" max="100"></div>
+            </div>
+            <div class="actions"><button class="btn primary" type="submit">Get advisory prompts</button></div>
+          </form>
+          <div class="card advisory" id="advisory-result"><p>Suggestions will appear here.</p></div>
         </section>
 
         <section id="quality" class="view hidden">
@@ -539,6 +573,9 @@
       overview: "Overview",
       exam: "Exam score",
       placement: "Placement",
+      clusters: "Student clusters",
+      fairness: "Fairness",
+      advisory: "Advisory support",
       quality: "Data quality",
       models: "Model performance",
       notes: "Notes",
@@ -567,6 +604,36 @@
     const pct = (value, digits = 1) => (value == null ? "—" : `${(Number(value) * 100).toFixed(digits)}%`);
     const kv = (label, value) => `<tr><th>${label}</th><td>${value}</td></tr>`;
     const tile = (label, value) => `<div class="metric"><small>${label}</small><strong>${value}</strong></div>`;
+    const suggestions = (items) => items && items.length
+      ? `<div class="advisory"><b>Advisory suggestions</b><ul>${items.map((item) => `<li>${item}</li>`).join("")}</ul><small>These are not guarantees or institutional decisions.</small></div>`
+      : `<div class="advisory">No specific prompts for these inputs. This is not a guarantee of any outcome.</div>`;
+
+    async function loadClusters() {
+      try {
+        const data = await api("/api/clusters");
+        const max = Math.max(...Object.values(data.cluster_counts));
+        $("#clusters-card").innerHTML =
+          `<p><b>${data.method}</b> across ${int(data.rows)} records; silhouette score ${dec(data.silhouette_score, 3)}.</p>` +
+          `<table><thead><tr><th>Cluster</th><th>Count</th><th>Relative size</th><th>Description</th></tr></thead><tbody>` +
+          data.cluster_centers.map((cluster) =>
+            `<tr><td>${cluster.cluster}</td><td>${int(cluster.count)}</td><td><div class="bar"><span style="width:${(cluster.count / max) * 100}%"></span></div></td><td>${cluster.description}</td></tr>`
+          ).join("") + `</tbody></table><p class="muted">${data.limitations.join(" ")}</p>`;
+      } catch (error) {
+        $("#clusters-card").innerHTML = `<p class="error">${error.message}</p>`;
+      }
+    }
+
+    async function loadFairness() {
+      try {
+        const data = await api("/api/fairness");
+        $("#fairness-card").innerHTML =
+          `<table><thead><tr><th>Group</th><th>Group size</th><th>MAE</th></tr></thead><tbody>` +
+          data.results.map((row) => `<tr><td>${row.group_column}: ${row.group}</td><td>${int(row.group_size)}</td><td>${dec(row.mean_absolute_error, 3)}</td></tr>`).join("") +
+          `</tbody></table><p class="muted">${data.limitations.join(" ")}</p>`;
+      } catch (error) {
+        $("#fairness-card").innerHTML = `<p class="error">${error.message}</p>`;
+      }
+    }
 
     async function loadSummary() {
       const data = await api("/api/summary");
@@ -815,7 +882,8 @@
           `<span class="eyebrow">Result</span>` +
           `<div class="big">${data.rounded_score}<span>/100</span></div>` +
           `<p><b>${data.tier}.</b> ${interval}</p>` +
-          `<p>Model: ${data.model}. The exam dataset is independent of the placement dataset.</p>`;
+          `<p>Model: ${data.model}. This estimate is not guaranteed.</p>` +
+          suggestions(data.advisory_suggestions);
       } catch (error) {
         result.innerHTML = `<span class="eyebrow">Result</span><p class="error">${error.message}</p>`;
       }
@@ -833,10 +901,26 @@
         result.innerHTML =
           `<span class="eyebrow">Result</span>` +
           `<div class="big">${data.percentage}<span>% probability</span></div>` +
-          `<p><b>${data.placed ? "Likely placed" : "Likely not placed"}.</b> ${data.warning}</p>` +
-          `<p>Model: ${data.model}.</p>`;
+          `<p>${data.warning}</p><p>Model: ${data.model}. This is not a guarantee.</p>` +
+          suggestions(data.advisory_suggestions);
       } catch (error) {
         result.innerHTML = `<span class="eyebrow">Result</span><p class="error">${error.message}</p>`;
+      }
+    });
+
+    $("#advisory-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const result = $("#advisory-result");
+      result.innerHTML = `<p class="loading">Loading advisory prompts…</p>`;
+      try {
+        const data = await api("/api/interventions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(Object.fromEntries(new FormData(event.target).entries())),
+        });
+        result.innerHTML = suggestions(data.suggestions);
+      } catch (error) {
+        result.innerHTML = `<p class="error">${error.message}</p>`;
       }
     });
 
@@ -853,6 +937,8 @@
       $("#q-issues").textContent = "Data-quality output is not available. Run python scripts/data_quality.py.";
     });
     loadPca();
+    loadClusters();
+    loadFairness();
 
     if (location.hash && document.getElementById(location.hash.slice(1))) {
       show(location.hash.slice(1));

@@ -7,6 +7,7 @@ import joblib
 import pandas as pd
 from flask import Flask, jsonify, render_template, request, send_file
 
+from scripts.interventions import build_interventions
 from scripts.model_config import (
     EXAM_CATEGORICAL_FEATURES,
     EXAM_MODEL_FEATURES,
@@ -18,6 +19,7 @@ from scripts.model_config import (
 
 ROOT = Path(__file__).resolve().parent
 MODELS_DIR = ROOT / "models"
+SPLITS_DIR = ROOT / "data" / "splits"
 METRICS_DIR = ROOT / "outputs" / "metrics"
 EVALUATION_DIR = ROOT / "outputs" / "evaluation"
 EXPLANATION_DIR = ROOT / "outputs" / "explanations"
@@ -49,11 +51,69 @@ def _read_json(path: Path):
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+MODEL_CARD = _read_json(MODEL_CARD_FILE) or {}
 EXAM_FEATURES = EXAM_MODEL_FEATURES
 PLACEMENT_FEATURES = PLACEMENT_MODEL_FEATURES
-EXAM_MODEL = joblib.load(MODELS_DIR / "LinearRegression_exam_score.joblib")
-PLACEMENT_MODEL = joblib.load(MODELS_DIR / "RandomForestClassifier_placement.joblib")
-MODEL_CARD = _read_json(MODEL_CARD_FILE) or {}
+
+
+def _feature_order(track: str) -> list[str]:
+    path = SPLITS_DIR / f"{'exam_score' if track == 'exam' else 'placement'}_train.csv"
+    if not path.exists():
+        raise FileNotFoundError(f"Run python scripts/select_and_split.py first; missing {path.name}.")
+    frame = pd.read_csv(path, nrows=0)
+    expected = EXAM_MODEL_FEATURES if track == "exam" else PLACEMENT_MODEL_FEATURES
+    missing = [column for column in expected if column not in frame.columns]
+    if missing:
+        raise ValueError(f"{path.name} is missing trained model features: {', '.join(missing)}.")
+    return [column for column in frame.columns if column in expected]
+
+
+def _load_model(track: str):
+    filename = (
+        "LinearRegression_exam_score.joblib"
+        if track == "exam"
+        else "RandomForestClassifier_placement.joblib"
+    )
+    path = MODELS_DIR / filename
+    if not path.exists():
+        raise FileNotFoundError(f"Run python scripts/train_baselines.py first; missing {filename}.")
+    return joblib.load(path)
+
+
+def _prediction_payload() -> dict:
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        raise ValueError("Request body must be a JSON object.")
+    return payload
+
+
+def _schema_field(name: str, label: str, field_type: str, required: bool, **kwargs) -> dict:
+    return {"field": name, "label": label, "type": field_type, "required": required, **kwargs}
+
+
+def _prediction_schema() -> dict:
+    return {
+        "exam": [
+            _schema_field("hours_studied", "Hours studied per week", "number", True, minimum=0, maximum=168),
+            _schema_field("attendance", "Attendance (%)", "number", True, minimum=0, maximum=100),
+            _schema_field("previous_scores", "Previous scores", "number", True, minimum=0, maximum=100),
+            _schema_field("tutoring_sessions", "Tutoring sessions", "number", True, minimum=0, maximum=100),
+            _schema_field("access_to_resources", "Access to resources", "category", True, allowed=EXAM_CATEGORICAL_FEATURES["Access_to_Resources"]),
+            _schema_field("parental_involvement", "Parental involvement", "category", True, allowed=EXAM_CATEGORICAL_FEATURES["Parental_Involvement"]),
+            _schema_field("parental_education_level", "Parental education", "category", True, allowed=EXAM_CATEGORICAL_FEATURES["Parental_Education_Level"]),
+            _schema_field("family_income", "Family income", "category", True, allowed=EXAM_CATEGORICAL_FEATURES["Family_Income"]),
+        ],
+        "placement": [
+            _schema_field("iq", "IQ", "number", True, minimum=70, maximum=160),
+            _schema_field("prev_sem_result", "Previous semester result", "number", True, minimum=0, maximum=10),
+            _schema_field("cgpa", "CGPA", "number", True, minimum=0, maximum=10),
+            _schema_field("academic_performance", "Academic performance", "number", True, minimum=0, maximum=10),
+            _schema_field("internship_experience", "Internship experience", "category", True, allowed=PLACEMENT_CATEGORICAL_FEATURES["Internship_Experience"]),
+            _schema_field("extra_curricular_score", "Extra-curricular score", "number", True, minimum=0, maximum=10),
+            _schema_field("communication_skills", "Communication skills", "number", True, minimum=0, maximum=10),
+            _schema_field("projects_completed", "Projects completed", "number", True, minimum=0, maximum=10),
+        ],
+    }
 
 
 def _metrics_records() -> list[dict]:
@@ -313,10 +373,73 @@ def model_card():
     return jsonify(MODEL_CARD)
 
 
+@app.get("/api/prediction-schema")
+def prediction_schema():
+    try:
+        schema = _prediction_schema()
+        schema["feature_order"] = {
+            "exam": _feature_order("exam"),
+            "placement": _feature_order("placement"),
+        }
+    except (FileNotFoundError, ValueError) as exc:
+        return jsonify({"error": str(exc)}), 503
+    return jsonify(schema)
+
+
+def _generated_json(path: Path, instruction: str):
+    report = _read_json(path)
+    if report is None:
+        return jsonify({"error": instruction}), 503
+    return jsonify(report)
+
+
+@app.get("/api/clusters")
+def clusters():
+    return _generated_json(
+        ROOT / "outputs" / "clustering" / "cluster_summary.json",
+        "Run python scripts/clustering.py first.",
+    )
+
+
+@app.get("/api/fairness")
+def fairness():
+    return _generated_json(
+        ROOT / "outputs" / "fairness" / "fairness_summary.json",
+        "Run python scripts/fairness_analysis.py first.",
+    )
+
+
+@app.post("/api/interventions")
+def interventions():
+    try:
+        payload = _prediction_payload()
+        values = {}
+        optional_ranges = {
+            "attendance": (0, 100),
+            "previous_scores": (0, 100),
+            "communication_skills": (0, 10),
+            "projects_completed": (0, 100),
+            "hours_studied": (0, 168),
+        }
+        for key, (minimum, maximum) in optional_ranges.items():
+            if key in payload:
+                values[key] = _number(payload, key, minimum, maximum)
+        suggestions = build_interventions(values)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify(
+        {
+            "suggestions": suggestions,
+            "advisory_only": True,
+            "note": "Suggestions are explainable prompts, not model output or institutional decisions.",
+        }
+    )
+
+
 @app.post("/api/predict/exam")
 def predict_exam():
-    payload = request.get_json(silent=True) or {}
     try:
+        payload = _prediction_payload()
         values = {
             "Hours_Studied": _number(payload, "hours_studied", 0, 168),
             "Attendance": _number(payload, "attendance", 0, 100),
@@ -337,9 +460,12 @@ def predict_exam():
                 payload, "family_income", EXAM_CATEGORICAL_FEATURES["Family_Income"]
             ),
         }
-        prediction = float(EXAM_MODEL.predict(_prediction_frame(values, EXAM_FEATURES))[0])
+        model = _load_model("exam")
+        prediction = float(model.predict(_prediction_frame(values, _feature_order("exam")))[0])
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
+    except (FileNotFoundError, OSError, ValueError) as exc:
+        return jsonify({"error": f"Prediction unavailable: {exc}"}), 503
 
     score = max(0.0, min(100.0, prediction))
     interval = None
@@ -355,17 +481,22 @@ def predict_exam():
             "interval_basis": interval_basis,
             "tier": "Strong" if score >= 75 else "Average" if score >= 50 else "At risk",
             "model": _model_label("exam"),
+            "limitations": [
+                "This is an experimental estimate from a baseline model.",
+                "The estimate is not guaranteed and does not describe a linked placement record.",
+            ],
+            "advisory_suggestions": build_interventions(payload),
         }
     )
 
 
 @app.post("/api/predict/placement")
 def predict_placement():
-    payload = request.get_json(silent=True) or {}
     try:
+        payload = _prediction_payload()
         values = {
             "CGPA": _number(payload, "cgpa", 0, 10),
-            "Communication_Skills": _number(payload, "communication_skills", 1, 10),
+            "Communication_Skills": _number(payload, "communication_skills", 0, 10),
             "Prev_Sem_Result": _number(payload, "prev_sem_result", 0, 10),
             "IQ": _number(payload, "iq", 70, 160),
             "Projects_Completed": _number(payload, "projects_completed", 0, 10),
@@ -377,11 +508,14 @@ def predict_placement():
                 PLACEMENT_CATEGORICAL_FEATURES["Internship_Experience"],
             ),
         }
-        frame = _prediction_frame(values, PLACEMENT_FEATURES)
-        prediction = int(PLACEMENT_MODEL.predict(frame)[0])
-        probability = float(PLACEMENT_MODEL.predict_proba(frame)[0, 1])
+        model = _load_model("placement")
+        frame = _prediction_frame(values, _feature_order("placement"))
+        prediction = int(model.predict(frame)[0])
+        probability = float(model.predict_proba(frame)[0, 1])
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
+    except (FileNotFoundError, OSError, ValueError) as exc:
+        return jsonify({"error": f"Prediction unavailable: {exc}"}), 503
 
     linkage = _linkage_status()
     return jsonify(
@@ -395,8 +529,14 @@ def predict_placement():
             "warning": (
                 "This result comes from the independent placement dataset. "
                 "The placement label is deterministic in this source, so high "
-                "scores reflect dataset construction, not real-world accuracy."
+                "scores reflect dataset construction, not real-world accuracy. "
+                "The data is synthetic/experimental."
             ),
+            "limitations": [
+                "This probability is not a guarantee of placement.",
+                "The source data is synthetic/experimental and its label is deterministic.",
+            ],
+            "advisory_suggestions": build_interventions(payload),
         }
     )
 

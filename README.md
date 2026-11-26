@@ -91,6 +91,8 @@ python scripts/cross_validation.py
 python scripts/overfitting_analysis.py
 python scripts/leakage_investigation.py
 python scripts/explain_models.py
+python scripts/clustering.py
+python scripts/fairness_analysis.py
 ```
 
 The scripts run in this order:
@@ -119,6 +121,10 @@ The scripts run in this order:
     deterministic targets, and synthetic-pairing limitations.
 13. `explain_models.py` computes linear coefficients, tree importances, and
     permutation importance on the test split.
+14. `clustering.py` groups exam-track inputs without using the exam score and
+    writes descriptive cluster summaries.
+15. `fairness_analysis.py` compares held-out exam-model error across available
+    groups with a minimum group-size threshold.
 
 `scripts/model_config.py` is a shared configuration module rather than a
 script to run. `scripts/model_pipelines.py` is the reusable pipeline and model
@@ -170,6 +176,9 @@ GET  /api/data-quality
 GET  /api/pca
 GET  /api/pca/visualization
 GET  /api/placement-investigation
+GET  /api/prediction-schema
+GET  /api/clusters
+GET  /api/fairness
 ```
 
 `/api/model-performance`, `/api/cross-validation`, `/api/overfitting`,
@@ -181,6 +190,7 @@ files. They do not contain hardcoded metric values.
 ```text
 POST /api/predict/exam
 POST /api/predict/placement
+POST /api/interventions
 ```
 
 Example exam request:
@@ -216,6 +226,17 @@ Example placement request:
 The prediction endpoints validate numeric ranges and category values. Category
 fields accept their labels; legacy zero-based category indexes are also
 accepted by the API.
+
+Prediction values are experimental estimates, not guarantees. Placement
+responses explicitly identify the synthetic/experimental source data. The
+interventions endpoint returns conservative advisory prompts separately from
+model output.
+
+Clustering uses K-Means with standardized, target-free exam-track inputs and
+writes its assignments, summary, silhouette score, and visualization under
+`outputs/clustering/`. Fairness analysis compares exam regression MAE across
+available Gender, Family_Income, School_Type, and Learning_Disabilities groups
+with a minimum group-size threshold; it is not a complete fairness audit.
 
 ## Modeling approach
 
